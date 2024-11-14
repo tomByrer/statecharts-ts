@@ -2,15 +2,18 @@
   "name": "statechart-ts",
   "version": "0.1.0",
   "description": "A class-less, type-safe state machine library for TypeScript.",
-  "main": "dist/index.js",
-  "module": "dist/index.mjs",
+  "main": "dist/index.cjs.js",
+  "module": "dist/index.esm.js",
   "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
   "scripts": {
-    "build": "tsc",
-    "test": "vitest --watch",
-    "dev": "tsc --watch",
-    "prepare": "npm run build",
+    "build": "tsup src/index.ts --format cjs,esm --dts",
     "lint": "eslint . --ext .ts",
+    "format": "prettier --write .",
+    "test": "vitest",
+    "test:coverage": "vitest run --coverage",
     "prepublishOnly": "npm run test && npm run build"
   },
   "author": "Michael Beswick",
@@ -25,7 +28,13 @@
     "@types/jest": "^29.5.13",
     "@types/node": "^20.16.13",
     "@types/react": "^18.3.12",
+    "@typescript-eslint/eslint-plugin": "^8.14.0",
+    "@typescript-eslint/parser": "^8.14.0",
     "eslint": "^8.57.1",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-prettier": "^5.2.1",
+    "prettier": "^3.3.3",
+    "tsup": "^8.3.5",
     "typescript": "^5.6.3",
     "vitest": "^2.1.3"
   },

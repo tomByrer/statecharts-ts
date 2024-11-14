@@ -18,7 +18,7 @@ type EventHandler<C, S extends string> = ({
 type StateDefinition<
   C extends MachineContext,
   E extends MachineEvent,
-  S extends string = string
+  S extends string = string,
 > = {
   states?: Record<S, StateDefinition<C, E>>;
   on?: {
@@ -29,7 +29,7 @@ type StateDefinition<
 type RootStateDefinition<
   C extends MachineContext,
   E extends MachineEvent,
-  S extends string
+  S extends string,
 > = StateDefinition<C, E, S> & {
   events: E;
   context: C;
@@ -39,7 +39,7 @@ type RootStateDefinition<
 function inferStateMachine<
   C extends MachineContext,
   E extends MachineEvent,
-  S extends string
+  S extends string,
 >(stateDefinition: RootStateDefinition<C, E, S>) {
   function subscribe(callback: (state: S, context: C) => () => void) {}
 }

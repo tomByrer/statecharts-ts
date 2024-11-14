@@ -118,5 +118,5 @@ const machine = new StateMachine(
       },
     },
   },
-  { context, updateContext }
+  { context, updateContext },
 );

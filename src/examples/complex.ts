@@ -33,7 +33,7 @@ const machine = machineFactory({
               }
               // Log a message if the condition is not met
               console.log(
-                chalk.yellow('Condition not met to transition to ab')
+                chalk.yellow('Condition not met to transition to ab'),
               );
             },
           },
@@ -81,9 +81,9 @@ const machine = machineFactory({
                 console.log(
                   chalk.red(
                     `Entered bab with updated context: ${JSON.stringify(
-                      context
-                    )}`
-                  )
+                      context,
+                    )}`,
+                  ),
                 );
               },
             },
@@ -103,8 +103,8 @@ const machine = machineFactory({
             console.log(
               chalk.cyan(
                 'Entering bc with current context:',
-                JSON.stringify(context)
-              )
+                JSON.stringify(context),
+              ),
             );
           },
         },
@@ -119,7 +119,7 @@ const machine = machineFactory({
           // Action to perform when entering the initial state 'ca'
           onEntry: ({ context }) => {
             console.log(
-              chalk.green('Initial state ca of state c, x:', context.x)
+              chalk.green('Initial state ca of state c, x:', context.x),
             );
           },
           on: {

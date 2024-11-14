@@ -3,7 +3,7 @@ export type StateType = 'initial' | 'sequential' | 'parallel' | 'leaf';
 type AfterHandler<C, S extends string> = (
   stateName: S,
   ms: number,
-  callback?: ({ context }: { context?: C }) => void
+  callback?: ({ context }: { context?: C }) => void,
 ) => void;
 
 type EntryHandler<C, S extends string> = (params: {
@@ -73,10 +73,10 @@ export class StateMachine<E extends MachineEvent, C, S extends string> {
 
   constructor(
     config: MachineConfig<E, C, S>,
-    machineContext: MachineContext<E, C, S>
+    machineContext: MachineContext<E, C, S>,
   ) {
     this.config = config;
-    this.type = config.states ? config.type ?? 'sequential' : 'leaf';
+    this.type = config.states ? (config.type ?? 'sequential') : 'leaf';
     this.onEntry = config.onEntry as EntryHandler<C, S>;
     this.onExit = config.onExit;
     this.machineContext = machineContext;
@@ -94,7 +94,7 @@ export class StateMachine<E extends MachineEvent, C, S extends string> {
         // Create the state
         this.states[stateName as S] = new StateMachine<E, C, S>(
           stateConfig,
-          this.machineContext
+          this.machineContext,
         );
 
         // If the state is the initial state, set it
@@ -131,7 +131,7 @@ export class StateMachine<E extends MachineEvent, C, S extends string> {
   transitionAfter(
     stateName: S,
     ms: number,
-    callback?: ({ context }: { context?: C }) => void
+    callback?: ({ context }: { context?: C }) => void,
   ) {}
 
   send(event: E): void {

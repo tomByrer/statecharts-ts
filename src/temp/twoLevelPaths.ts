@@ -49,11 +49,12 @@ type NestedStates3<T> = T extends { states: infer U }
     : never
   : never;
 
-type OneOrTwoLevelPaths<T> = T extends Record<string, any>
-  ? {
-      [K in keyof T]: K | `${K}/${NestedStates2<T[K]>}`;
-    }[keyof T]
-  : never;
+type OneOrTwoLevelPaths<T> =
+  T extends Record<string, any>
+    ? {
+        [K in keyof T]: K | `${K}/${NestedStates2<T[K]>}`;
+      }[keyof T]
+    : never;
 
 // Usage example with the provided config object
 type TwoLevelPaths = OneOrTwoLevelPaths<(typeof config)['states']>;

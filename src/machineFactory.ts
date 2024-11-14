@@ -17,23 +17,26 @@ import { StateMachineRoot } from './stateMachineRoot';
  * @property {C} [context] - An optional context object that can be used to store
  * and pass data between states and event handlers.
  */
-export type RootStateDefinition<C = any> = {
-  type?: Exclude<StateType, 'leaf' | 'initial'>;
-  states: Record<string, MachineConfig<C>>;
-  events: MachineEvent;
+export type RootStateDefinition<
+  E extends MachineEvent,
+  C extends any
+> = MachineConfig<E, C, string> & {
   context: C;
 };
-
 /**
  * Factory function to create a state machine.
  * @param config - The configuration for the state machine.
  * @returns An object with methods to get the state and send events.
  */
 
-export function machineFactory<C extends any>(
-  config: RootStateDefinition<C>
-): Machine<C> {
+export function machineFactory<E extends MachineEvent, C extends any>(
+  config: RootStateDefinition<E, C>
+): Machine<E, C, string> {
   return new StateMachineRoot(config);
 }
 
-export type Machine<C extends any = {}> = StateMachineRoot<C>;
+export type Machine<
+  E extends MachineEvent,
+  C extends any,
+  S extends string
+> = StateMachineRoot<E, C, S>;

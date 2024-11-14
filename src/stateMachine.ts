@@ -65,7 +65,7 @@ export class StateMachine<E extends MachineEvent, C, S extends string> {
   private onEntry?: EntryHandler<C, S>;
   private onExit?: ExitHandler<C>;
   private onTransition?: TransitionHandler<S>;
-  private activeStates: S[] = [];
+  private activeStates: string[] = [];
   private timers: ReturnType<typeof setTimeout>[] = [];
 
   private config: MachineConfig<E, C, S>;

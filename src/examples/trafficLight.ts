@@ -65,18 +65,18 @@ const machine = machineFactory({
       },
     },
     go: {
-      onEntry: ({ context, updateContext }) => {
+      onEntry: ({ updateContext }) => {
         updateContext({
           traffic: { red: false, amber: false, green: true },
           pedestrians: { red: false, green: true, wait: false },
         });
       },
       on: {
-        stop: ({ transition, updateContext }) => {
-          transition('stop');
+        stop: ({ updateContext }) => {
           updateContext({
             pedestrians: { red: false, green: true, wait: true },
           });
+          return 'stop';
         },
       },
     },

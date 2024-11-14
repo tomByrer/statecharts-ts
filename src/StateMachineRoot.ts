@@ -1,29 +1,31 @@
 import { RootStateDefinition } from './machineFactory';
-import { StateMachine, MachineState, MachineEvent } from './stateMachine';
+import {
+  StateMachine,
+  MachineState,
+  MachineEvent,
+  MachineConfig,
+} from './stateMachine';
 
 /**
  * Class representing the root state machine.
  * @template C - The type of the context object.
  */
-export class StateMachineRoot<C> {
+export class StateMachineRoot<E extends MachineEvent, C, S extends string> {
   private subscriptions: ((state: MachineState, context: C) => void)[] = [];
-  private state: StateMachine<C>;
+  private state: StateMachine<E, C, S>;
   private context: C;
   private isRunning = false;
+  private stateMap: Map<S, StateMachine<E, C, S>>;
 
-  constructor(private config: RootStateDefinition<C>) {
+  constructor(private config: RootStateDefinition<E, C>) {
     this.context = config.context;
-    this.state = new StateMachine(
-      this.config,
-      {
-        name: '$',
-        transition: () => {},
-        getPathToState: () => [],
-        onTransition: this.notifySubscribers.bind(this),
-      },
+    this.stateMap = new Map();
+    this.state = new StateMachine<E, C, S>(
+      this.config as MachineConfig<E, C, S>,
       {
         context: this.context,
         updateContext: this.updateContext.bind(this),
+        stateMap: this.stateMap,
       }
     );
   }
@@ -73,7 +75,7 @@ export class StateMachineRoot<C> {
     return this.context;
   }
 
-  send(event: MachineEvent) {
+  send(event: E) {
     if (!this.isRunning) {
       throw new Error('State machine is not running');
     }

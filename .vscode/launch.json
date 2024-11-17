@@ -4,74 +4,32 @@
     {
       "type": "node",
       "request": "launch",
-      "name": "Debug Basic Example",
-      "program": "${workspaceFolder}/src/examples/basic.ts",
-      "runtimeArgs": ["-r", "tsx"],
+      "name": "Debug TSX Script (Watch Mode)",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["tsx", "--watch"],
+      "args": ["${file}"],
+      "skipFiles": ["<node_internals>/**"],
+      "outFiles": ["${workspaceFolder}/**/*.js"],
       "sourceMaps": true,
-      "smartStep": true,
-      "internalConsoleOptions": "openOnSessionStart",
-      "outFiles": ["${workspaceFolder}/dist/**/*.js"]
-    },
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "Debug Complex Example",
-      "program": "${workspaceFolder}/src/examples/complex.ts",
-      "runtimeArgs": ["-r", "tsx"],
-      "sourceMaps": true,
-      "smartStep": true,
-      "internalConsoleOptions": "openOnSessionStart",
-      "outFiles": ["${workspaceFolder}/dist/**/*.js"]
-    },
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "Debug DJ Deck Example",
-      "program": "${workspaceFolder}/src/examples/djDeck.ts",
-      "runtimeArgs": ["-r", "tsx"],
-      "sourceMaps": true,
-      "smartStep": true,
-      "internalConsoleOptions": "openOnSessionStart",
-      "outFiles": ["${workspaceFolder}/dist/**/*.js"]
-    },
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "Debug Traffic Light Example",
-      "program": "${workspaceFolder}/src/examples/trafficLight.ts",
-      "runtimeArgs": ["-r", "tsx"],
-      "sourceMaps": true,
-      "smartStep": true,
-      "internalConsoleOptions": "openOnSessionStart",
-      "outFiles": ["${workspaceFolder}/dist/**/*.js"]
-    },
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "Debug Current File",
-      "program": "${file}",
-      "runtimeArgs": ["-r", "tsx"],
-      "sourceMaps": true,
-      "smartStep": true,
-      "internalConsoleOptions": "openOnSessionStart",
-      "outFiles": ["${workspaceFolder}/dist/**/*.js"]
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/**",
+        "!**/node_modules/**"
+      ]
     },
     {
       "type": "node",
       "request": "launch",
       "name": "Debug Vitest Tests",
-      "program": "${workspaceFolder}/node_modules/vitest/vitest.mjs",
-      "args": [
-        "--run",
-        "--inspect-brk",
-        "--no-file-parallelism",
-        "--watch",
-        "${file}"
-      ],
-      "autoAttachChildProcesses": true,
-      "smartStep": true,
-      "console": "integratedTerminal",
-      "internalConsoleOptions": "neverOpen"
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vitest", "--run", "--threads", "false"],
+      "args": ["${workspaceFolder}/path/to/your/test/file.test.ts"],
+      "skipFiles": ["<node_internals>/**"],
+      "outFiles": ["${workspaceFolder}/**/*.js"],
+      "sourceMaps": true,
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/**",
+        "!**/node_modules/**"
+      ]
     }
   ]
 }

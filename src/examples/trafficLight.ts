@@ -166,5 +166,3 @@ process.stdin.on('data', (key: Buffer) => {
 });
 
 console.log(chalk.cyan('Press SPACE to trigger stop, CTRL+C to exit'));
-
-console.log(machine.state);

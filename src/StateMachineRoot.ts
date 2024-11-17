@@ -1,11 +1,8 @@
 import { EventBus } from './EventBus';
 import { RootStateDefinition } from './machineFactory';
-import {
-  StateMachine,
-  MachineState,
-  MachineEvent,
-  MachineConfig,
-} from './StateMachine';
+import { StateMachine, MachineEvent, MachineConfig } from './StateMachine';
+
+type StateChangeHandler<M, C> = (state: M, context: C) => void;
 
 /**
  * Root class for managing a hierarchical state machine.
@@ -15,7 +12,7 @@ import {
  * @template S - The type of state names (must extend string)
  */
 export class StateMachineRoot<E extends MachineEvent, C, S extends string> {
-  private subscriptions: ((state: MachineState, context: C) => void)[] = [];
+  private subscriptions: StateChangeHandler<S, C>[] = [];
   private state: StateMachine<E, C, S>;
   private context: C;
   private isRunning = false;
@@ -30,8 +27,23 @@ export class StateMachineRoot<E extends MachineEvent, C, S extends string> {
         context: this.context,
         updateContext: this.updateContext.bind(this),
         eventBus: this.eventBus,
+        onTransition: this.notifySubscribers,
       },
     );
+  }
+
+  subscribe(handler: StateChangeHandler<S, C>) {
+    this.subscriptions.push(handler);
+  }
+
+  unsubscribe(handler: StateChangeHandler<S, C>) {
+    this.subscriptions = this.subscriptions.filter((h) => h !== handler);
+  }
+
+  notifySubscribers(state: S) {
+    for (const handler of this.subscriptions) {
+      handler(state, this.context);
+    }
   }
 
   /**

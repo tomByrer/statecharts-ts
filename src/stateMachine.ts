@@ -121,6 +121,10 @@ export class StateMachine<E extends MachineEvent, C, S extends string> {
         updateContext: this.machineContext.updateContext,
       });
     }
+
+    if (this.type === 'sequential') {
+      this.transition(this.activeState as S);
+    }
   }
 
   exit(): void {

@@ -1,5 +1,5 @@
-import { MachineConfig } from './stateMachine';
-import { StateMachineRoot } from './stateMachineRoot';
+import { MachineConfig } from './StateMachine';
+import { StateMachineRoot } from './StateMachineRoot';
 
 /**
  * Defines the root state configuration for a state machine.

@@ -44,7 +44,6 @@ export class StateMachineRoot<E extends MachineEvent, C, S extends string> {
     }
 
     this.state.enter();
-    this.notifySubscribers();
     this.isRunning = true;
   }
 
@@ -62,36 +61,6 @@ export class StateMachineRoot<E extends MachineEvent, C, S extends string> {
    */
   updateContext(context: Partial<C>) {
     this.context = structuredClone({ ...this.context, ...context });
-  }
-
-  /**
-   * Subscribes to state machine updates.
-   * @param handler - Callback function that receives current state and context
-   * @returns Unsubscribe function
-   */
-  subscribe(handler: (state: MachineState, context: C) => void) {
-    this.subscriptions.push(handler);
-
-    return () => this.unsubscribe(handler);
-  }
-
-  /**
-   * Unsubscribes a handler from state machine updates.
-   * @param handler - The handler function to remove
-   */
-  unsubscribe(handler: (state: MachineState, context: C) => void) {
-    this.subscriptions = this.subscriptions.filter((h) => h !== handler);
-  }
-
-  /**
-   * Notifies all subscribers of the current state and context.
-   */
-  notifySubscribers() {
-    const state = this.getState();
-
-    for (const handler of this.subscriptions) {
-      handler(state, this.context);
-    }
   }
 
   /**

@@ -47,22 +47,22 @@ const machine = machineFactory({
   },
   states: {
     stop: {
-      onEntry: ({ context, updateContext, transitionAfter }) => {
+      onEntry: ({ context, updateContext, after }) => {
         updateContext({
           traffic: { red: true, amber: false, green: false },
           pedestrians: { red: false, green: true, wait: false },
         });
-        transitionAfter('readyGo', context.stopPeriod);
+        after(context.stopPeriod, () => 'readyGo');
       },
     },
     readyGo: {
       type: 'initial',
-      onEntry: ({ context, updateContext, transitionAfter }) => {
+      onEntry: ({ context, updateContext, after }) => {
         updateContext({
           traffic: { red: true, amber: true, green: false },
           pedestrians: { red: false, green: true, wait: false },
         });
-        transitionAfter('go', context.readyGoPeriod);
+        after(context.readyGoPeriod, () => 'go');
       },
     },
     go: {
@@ -82,12 +82,12 @@ const machine = machineFactory({
       },
     },
     readyStop: {
-      onEntry: ({ context, updateContext, transitionAfter }) => {
+      onEntry: ({ context, updateContext, after }) => {
         updateContext({
           traffic: { red: false, amber: true, green: false },
           pedestrians: { red: false, green: true, wait: false },
         });
-        transitionAfter('stop', Number(context.readyStopPeriod));
+        after(context.readyStopPeriod, () => 'stop');
       },
     },
   },

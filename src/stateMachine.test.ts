@@ -54,7 +54,7 @@ const machine = new StateMachine(
                 on: {
                   E4: () => 'beta1',
                 },
-                onEntry({ transitionAfter, context }) {
+                onEntry({ after: transitionAfter, context }) {
                   transitionAfter('beta1b', 1_000);
                 },
               },

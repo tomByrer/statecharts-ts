@@ -5,10 +5,10 @@ export type StateType = 'initial' | 'sequential' | 'parallel' | 'leaf';
 type AfterHandler<C, S extends string> = (
   ms: number,
   callback?: ({ context }: { context?: C }) => S,
-) => void;
+) => S;
 
 type EntryHandler<C, S extends string> = (params: {
-  transitionAfter: AfterHandler<C, S>;
+  after: AfterHandler<C, S>;
   context: C;
   updateContext: (context: Partial<C>) => void;
 }) => void;
@@ -116,7 +116,7 @@ export class StateMachine<E extends MachineEvent, C, S extends string> {
   enter(): void {
     if (this.onEntry) {
       this.onEntry({
-        transitionAfter: this.after,
+        after: this.after.bind(this),
         context: this.machineContext.context,
         updateContext: this.machineContext.updateContext,
       });
@@ -128,8 +128,8 @@ export class StateMachine<E extends MachineEvent, C, S extends string> {
       const state = this.states[this.activeState as S];
       state.exit();
     } else if (this.type === 'parallel') {
-      for (const state of this.states) {
-        state.exit();
+      for (const stateName in this.states) {
+        this.states[stateName].exit();
       }
     }
   }
@@ -154,11 +154,17 @@ export class StateMachine<E extends MachineEvent, C, S extends string> {
     state.enter();
   }
 
-  after(ms: number, callback?: ({ context }: { context?: C }) => S) {
+  after(ms: number, callback?: ({ context }: { context?: C }) => S): S {
     const timer = setTimeout(() => {
-      callback?.({ context: this.machineContext.context });
+      const nextState = callback?.({ context: this.machineContext.context });
+      if (nextState) {
+        this.transition(nextState);
+      }
     }, ms);
+
     this.timers.push(timer);
+
+    return this.activeState as S;
   }
 
   send(event: E): void {

@@ -53,7 +53,7 @@ export class StateMachineRoot<E extends MachineEvent, C, S extends string> {
    */
   public stop() {
     this.isRunning = false;
-    this.state.dispose();
+    this.state.exit();
   }
 
   /**

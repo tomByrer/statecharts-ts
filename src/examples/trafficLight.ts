@@ -1,5 +1,6 @@
 import chalk from 'chalk';
 import { machineFactory } from '../index';
+import cliui from 'cliui';
 
 /*
   Traffic light state machine
@@ -86,17 +87,82 @@ const machine = machineFactory({
           traffic: { red: false, amber: true, green: false },
           pedestrians: { red: false, green: true, wait: false },
         });
-        transitionAfter('stop', context.readyStopPeriod);
+        transitionAfter('stop', Number(context.readyStopPeriod));
       },
     },
   },
   events: {} as { type: 'stop' },
 });
 
+const ui = cliui({ width: 100 });
+
 machine.subscribe((state, context) => {
   const { pedestrians, traffic } = context;
   console.log(chalk.green('Transitioned to'), state);
-  console.table({ pedestrians, traffic });
+
+  ui.div(
+    {
+      text: 'Traffic',
+      align: 'center',
+      width: 15,
+      padding: [0, 1, 0, 0],
+    },
+    {
+      text: 'Pedestrians',
+      align: 'center',
+      width: 15,
+      padding: [0, 1, 0, 0],
+    },
+  );
+
+  ui.div(
+    {
+      text: [
+        traffic.red && 'Red',
+        traffic.amber && 'Amber',
+        traffic.green && 'Green',
+      ]
+        .filter(Boolean)
+        .join(' + '),
+      align: 'center',
+      width: 15,
+      padding: [0, 1, 0, 0],
+    },
+    {
+      text: [
+        pedestrians.red && 'Red',
+        pedestrians.green && 'Green',
+        pedestrians.wait && 'Wait',
+      ]
+        .filter(Boolean)
+        .join(' + '),
+      align: 'center',
+      width: 15,
+      padding: [0, 1, 0, 0],
+    },
+  );
+
+  console.log(ui.toString());
 });
 
 machine.start();
+
+// Add keyboard input handling
+process.stdin.setRawMode(true);
+process.stdin.resume();
+process.stdin.setEncoding('utf8');
+
+process.stdin.on('data', (key: Buffer) => {
+  // ctrl-c ( end of text )
+  if (key.toString() === '\u0003') {
+    console.log(chalk.yellow('\nExiting traffic light simulation'));
+    process.exit();
+  }
+  // space key
+  if (key.toString() === ' ') {
+    console.log(chalk.yellow('Sending stop event'));
+    machine.send({ type: 'stop' });
+  }
+});
+
+console.log(chalk.cyan('Press SPACE to trigger stop, CTRL+C to exit'));

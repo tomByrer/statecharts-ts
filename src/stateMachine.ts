@@ -1,9 +1,10 @@
+import { EventBus } from './EventBus';
+
 export type StateType = 'initial' | 'sequential' | 'parallel' | 'leaf';
 
 type AfterHandler<C, S extends string> = (
-  stateName: S,
   ms: number,
-  callback?: ({ context }: { context?: C }) => void,
+  callback?: ({ context }: { context?: C }) => S,
 ) => void;
 
 type EntryHandler<C, S extends string> = (params: {
@@ -53,7 +54,7 @@ export type MachineContext<E extends MachineEvent, C, S extends string> = {
   context: C;
   updateContext: (context: Partial<C>) => void;
   onTransition?: TransitionHandler<S>;
-  stateMap: Map<S, StateMachine<E, C, S>>;
+  eventBus: EventBus<E>;
 };
 
 export class StateMachine<E extends MachineEvent, C, S extends string> {
@@ -65,7 +66,7 @@ export class StateMachine<E extends MachineEvent, C, S extends string> {
   private onEntry?: EntryHandler<C, S>;
   private onExit?: ExitHandler<C>;
   private onTransition?: TransitionHandler<S>;
-  private activeStates: string[] = [];
+  private activeState: S | null = null;
   private timers: ReturnType<typeof setTimeout>[] = [];
 
   private config: MachineConfig<E, C, S>;
@@ -80,10 +81,8 @@ export class StateMachine<E extends MachineEvent, C, S extends string> {
     this.onEntry = config.onEntry as EntryHandler<C, S>;
     this.onExit = config.onExit;
     this.machineContext = machineContext;
-  }
 
-  public initialise(): void {
-    // If there are states, create them
+    // If there are child states, create them
     if (this.config.states) {
       const stateKeys = Object.keys(this.config.states);
       let initialState: S | null = null;
@@ -97,7 +96,10 @@ export class StateMachine<E extends MachineEvent, C, S extends string> {
           this.machineContext,
         );
 
-        // If the state is the initial state, set it
+        if (this.type !== 'sequential') {
+          continue;
+        }
+
         if (stateConfig.type === 'initial') {
           // It is illegal to have more than one initial state
           if (initialState) {
@@ -107,40 +109,63 @@ export class StateMachine<E extends MachineEvent, C, S extends string> {
         }
       }
 
-      // Transition to the initial state, or the first state if there is no initial state
-      if (initialState) {
-        this.transition(initialState);
-      } else {
-        this.transition(stateKeys[0] as S);
+      this.activeState = initialState;
+    }
+  }
+
+  enter(): void {
+    if (this.onEntry) {
+      this.onEntry({
+        transitionAfter: this.after,
+        context: this.machineContext.context,
+        updateContext: this.machineContext.updateContext,
+      });
+    }
+  }
+
+  exit(): void {
+    if (this.type === 'sequential') {
+      const state = this.states[this.activeState as S];
+      state.exit();
+    } else if (this.type === 'parallel') {
+      for (const state of this.states) {
+        state.exit();
       }
     }
   }
 
   transition(stateName: S) {
+    if (this.type !== 'sequential') {
+      throw new Error('Transitioning is not allowed in non-sequential states');
+    }
+
+    // Exit active state
+    if (this.activeState) {
+      this.states[this.activeState].exit();
+    }
+
+    // Enter the new state
     const state = this.states[stateName];
 
     if (!state) {
       throw new Error(`State ${stateName} not found`);
     }
 
-    if (!this.activeStates.includes(stateName)) {
-      this.activeStates.push(stateName);
-    }
+    state.enter();
   }
 
-  transitionAfter(
-    stateName: S,
-    ms: number,
-    callback?: ({ context }: { context?: C }) => void,
-  ) {}
+  after(ms: number, callback?: ({ context }: { context?: C }) => S) {
+    const timer = setTimeout(() => {
+      callback?.({ context: this.machineContext.context });
+    }, ms);
+    this.timers.push(timer);
+  }
 
   send(event: E): void {
-    // Handle the event with proper typing
+    this.machineContext.eventBus.send(event);
   }
 
   getState(): MachineState {
     return null;
   }
-
-  dispose(): void {}
 }

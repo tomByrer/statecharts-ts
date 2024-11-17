@@ -1,36 +1,60 @@
 {
-  // Use IntelliSense to learn about possible attributes.
-  // Hover to view descriptions of existing attributes.
-  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
   "version": "0.2.0",
   "configurations": [
     {
-      "type": "bun",
-      "internalConsoleOptions": "neverOpen",
+      "type": "node",
       "request": "launch",
-      "name": "Debug File",
-      "program": "${file}",
-      "cwd": "${workspaceFolder}",
-      "stopOnEntry": false,
-      "watchMode": false
+      "name": "Debug Basic Example",
+      "program": "${workspaceFolder}/src/examples/basic.ts",
+      "runtimeArgs": ["-r", "tsx"],
+      "sourceMaps": true,
+      "smartStep": true,
+      "internalConsoleOptions": "openOnSessionStart",
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"]
     },
     {
-      "type": "bun",
-      "internalConsoleOptions": "neverOpen",
+      "type": "node",
       "request": "launch",
-      "name": "Run File",
-      "program": "${file}",
-      "cwd": "${workspaceFolder}",
-      "noDebug": true,
-      "watchMode": false
+      "name": "Debug Complex Example",
+      "program": "${workspaceFolder}/src/examples/complex.ts",
+      "runtimeArgs": ["-r", "tsx"],
+      "sourceMaps": true,
+      "smartStep": true,
+      "internalConsoleOptions": "openOnSessionStart",
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"]
     },
     {
-      "type": "bun",
-      "internalConsoleOptions": "neverOpen",
-      "request": "attach",
-      "name": "Attach Bun",
-      "url": "ws://localhost:6499/",
-      "stopOnEntry": false
+      "type": "node",
+      "request": "launch",
+      "name": "Debug DJ Deck Example",
+      "program": "${workspaceFolder}/src/examples/djDeck.ts",
+      "runtimeArgs": ["-r", "tsx"],
+      "sourceMaps": true,
+      "smartStep": true,
+      "internalConsoleOptions": "openOnSessionStart",
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug Traffic Light Example",
+      "program": "${workspaceFolder}/src/examples/trafficLight.ts",
+      "runtimeArgs": ["-r", "tsx"],
+      "sourceMaps": true,
+      "smartStep": true,
+      "internalConsoleOptions": "openOnSessionStart",
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug Current File",
+      "program": "${file}",
+      "runtimeArgs": ["-r", "tsx"],
+      "sourceMaps": true,
+      "smartStep": true,
+      "internalConsoleOptions": "openOnSessionStart",
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"]
     },
     {
       "type": "node",

@@ -30,7 +30,7 @@ const machine = machineFactory({
       on: {
         // Handles the 'NEXT' event by transitioning to the 'active' state.
         // @param transition - Function to transition to another state.
-        NEXT: ({ transition }) => transition('active'),
+        NEXT: () => 'active',
 
         // Handles the 'INCREMENT' event by updating the context.
         // Increments the 'count' in the context by 1.
@@ -38,6 +38,7 @@ const machine = machineFactory({
         // @param updateContext - Function to update the context.
         INCREMENT: ({ context, updateContext }) => {
           updateContext({ count: context.count + 1 });
+          return 'idle';
         },
       },
     },
@@ -53,8 +54,7 @@ const machine = machineFactory({
       },
       on: {
         // Handles the 'NEXT' event by transitioning to the 'complete' state.
-        // @param transition - Function to transition to another state.
-        NEXT: ({ transition }) => transition('complete'),
+        NEXT: () => 'complete',
       },
     },
 

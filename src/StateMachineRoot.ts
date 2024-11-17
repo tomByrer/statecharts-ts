@@ -1,10 +1,11 @@
+import { EventBus } from './EventBus';
 import { RootStateDefinition } from './machineFactory';
 import {
   StateMachine,
   MachineState,
   MachineEvent,
   MachineConfig,
-} from './stateMachine';
+} from './StateMachine';
 
 /**
  * Root class for managing a hierarchical state machine.
@@ -18,17 +19,17 @@ export class StateMachineRoot<E extends MachineEvent, C, S extends string> {
   private state: StateMachine<E, C, S>;
   private context: C;
   private isRunning = false;
-  private stateMap: Map<S, StateMachine<E, C, S>>;
+  private eventBus: EventBus<E>;
 
   constructor(private config: RootStateDefinition<E, C>) {
     this.context = config.context;
-    this.stateMap = new Map();
+    this.eventBus = new EventBus();
     this.state = new StateMachine<E, C, S>(
       this.config as MachineConfig<E, C, S>,
       {
         context: this.context,
         updateContext: this.updateContext.bind(this),
-        stateMap: this.stateMap,
+        eventBus: this.eventBus,
       },
     );
   }
@@ -42,7 +43,7 @@ export class StateMachineRoot<E extends MachineEvent, C, S extends string> {
       return;
     }
 
-    this.state.initialise();
+    this.state.enter();
     this.notifySubscribers();
     this.isRunning = true;
   }

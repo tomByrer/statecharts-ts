@@ -14,11 +14,12 @@
     "format": "prettier --write .",
     "test": "vitest",
     "test:coverage": "vitest run --coverage",
-    "prepublishOnly": "npm run test && npm run build",
-    "example:basic": "tsx src/examples/basic.ts",
-    "example:complex": "tsx src/examples/complex.ts",
-    "example:djDeck": "tsx src/examples/djDeck.ts",
-    "example:trafficLight": "tsx --watch src/examples/trafficLight.ts"
+    "prepublishOnly": "npm run lint && npm run test && npm run build",
+    "example:basic": "tsx --watch --inspect src/examples/basic.ts",
+    "example:complex": "tsx --watch --inspect src/examples/complex.ts",
+    "example:djDeck": "tsx --watch --inspect src/examples/djDeck.ts",
+    "example:trafficLight": "tsx --watch --inspect src/examples/trafficLight.ts",
+    "prepare": "npm run build"
   },
   "author": "Michael Beswick",
   "license": "MIT",
@@ -34,13 +35,12 @@
     "@types/react": "^18.3.12",
     "@typescript-eslint/eslint-plugin": "^8.14.0",
     "@typescript-eslint/parser": "^8.14.0",
-    "cliui": "^8.0.1",
     "eslint": "^8.57.1",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-prettier": "^5.2.1",
     "prettier": "^3.3.3",
+    "tsx": "^4.7.1",
     "tsup": "^8.3.5",
-    "tsx": "^4.19.2",
     "typescript": "^5.6.3",
     "vitest": "^2.1.3"
   },
@@ -57,12 +57,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/<your-username>/statechart-ts.git"
+    "url": "https://github.com/your-username/statechart-ts.git"
   },
   "bugs": {
-    "url": "https://github.com/<your-username>/statechart-ts/issues"
+    "url": "https://github.com/your-username/statechart-ts/issues"
   },
-  "homepage": "https://github.com/<your-username>/statechart-ts#readme",
+  "homepage": "https://github.com/your-username/statechart-ts#readme",
   "dependencies": {
     "chalk": "^5.3.0"
   },

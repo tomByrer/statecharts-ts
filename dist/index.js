@@ -1,16 +1,34 @@
-// src/stateMachine.ts
+// src/EventBus.ts
+var EventBus = class {
+  constructor() {
+    this.subscriptions = [];
+  }
+  on(event, callback) {
+    this.subscriptions.push(callback);
+  }
+  off(event, callback) {
+    this.subscriptions = this.subscriptions.filter((c) => c !== callback);
+  }
+  send(event) {
+    this.subscriptions.forEach((callback) => callback(event));
+  }
+  clear() {
+    this.subscriptions = [];
+  }
+};
+
+// src/StateMachine.ts
 var StateMachine = class _StateMachine {
-  constructor(config, machineContext) {
+  constructor(config, machineContext, parentState) {
     this.states = {};
-    this.activeStates = [];
+    this.activeState = null;
     this.timers = [];
     this.config = config;
     this.type = config.states ? config.type ?? "sequential" : "leaf";
     this.onEntry = config.onEntry;
     this.onExit = config.onExit;
     this.machineContext = machineContext;
-  }
-  initialise() {
+    this.parentState = parentState;
     if (this.config.states) {
       const stateKeys = Object.keys(this.config.states);
       let initialState = null;
@@ -18,8 +36,12 @@ var StateMachine = class _StateMachine {
         const stateConfig = this.config.states[stateName];
         this.states[stateName] = new _StateMachine(
           stateConfig,
-          this.machineContext
+          this.machineContext,
+          this
         );
+        if (this.type !== "sequential") {
+          continue;
+        }
         if (stateConfig.type === "initial") {
           if (initialState) {
             throw new Error("Multiple initial states found");
@@ -27,49 +49,99 @@ var StateMachine = class _StateMachine {
           initialState = stateName;
         }
       }
-      if (initialState) {
-        this.transition(initialState);
-      } else {
-        this.transition(stateKeys[0]);
-      }
+      this.activeState = initialState;
     }
   }
+  enter() {
+    if (this.onEntry) {
+      this.onEntry({
+        after: this.after.bind(this),
+        context: this.machineContext.context,
+        updateContext: this.machineContext.updateContext
+      });
+    }
+    if (this.type === "sequential") {
+      this.transition(this.activeState);
+    }
+  }
+  exit() {
+    if (this.type === "sequential") {
+      const state = this.states[this.activeState];
+      state.exit();
+    } else if (this.type === "parallel") {
+      for (const stateName in this.states) {
+        this.states[stateName].exit();
+      }
+    }
+    this.onExit?.({
+      context: this.machineContext.context,
+      updateContext: this.machineContext.updateContext
+    });
+  }
   transition(stateName) {
+    if (this.type !== "sequential") {
+      throw new Error("Transitioning is not allowed in non-sequential states");
+    }
+    if (this.activeState) {
+      this.states[this.activeState].exit();
+    }
     const state = this.states[stateName];
     if (!state) {
       throw new Error(`State ${stateName} not found`);
     }
-    if (!this.activeStates.includes(stateName)) {
-      this.activeStates.push(stateName);
-    }
+    state.enter();
+    this.machineContext.onTransition?.(stateName);
   }
-  transitionAfter(stateName, ms, callback) {
+  after(ms, callback) {
+    const timer = setTimeout(() => {
+      const nextState = callback?.({
+        context: this.machineContext.context,
+        updateContext: this.machineContext.updateContext
+      });
+      if (nextState) {
+        this.parentState?.transition(nextState);
+      }
+    }, ms);
+    this.timers.push(timer);
+    return this.activeState;
   }
   send(event) {
+    this.machineContext.eventBus.send(event);
   }
   getState() {
     return null;
   }
-  dispose() {
-  }
 };
 
-// src/stateMachineRoot.ts
+// src/StateMachineRoot.ts
 var StateMachineRoot = class {
   constructor(config) {
     this.config = config;
     this.subscriptions = [];
     this.isRunning = false;
     this.context = config.context;
-    this.stateMap = /* @__PURE__ */ new Map();
+    this.eventBus = new EventBus();
     this.state = new StateMachine(
       this.config,
       {
         context: this.context,
         updateContext: this.updateContext.bind(this),
-        stateMap: this.stateMap
+        eventBus: this.eventBus,
+        onTransition: this.notifySubscribers.bind(this)
       }
     );
+    this.subscriptions = [];
+  }
+  subscribe(handler) {
+    this.subscriptions.push(handler);
+  }
+  unsubscribe(handler) {
+    this.subscriptions = this.subscriptions.filter((h) => h !== handler);
+  }
+  notifySubscribers(state) {
+    for (const handler of this.subscriptions) {
+      handler(state, this.context);
+    }
   }
   /**
    * Starts the state machine.
@@ -79,8 +151,7 @@ var StateMachineRoot = class {
     if (this.isRunning) {
       return;
     }
-    this.state.initialise();
-    this.notifySubscribers();
+    this.state.enter();
     this.isRunning = true;
   }
   /**
@@ -88,7 +159,7 @@ var StateMachineRoot = class {
    */
   stop() {
     this.isRunning = false;
-    this.state.dispose();
+    this.state.exit();
   }
   /**
    * Updates the context object with new values.
@@ -96,31 +167,6 @@ var StateMachineRoot = class {
    */
   updateContext(context) {
     this.context = structuredClone({ ...this.context, ...context });
-  }
-  /**
-   * Subscribes to state machine updates.
-   * @param handler - Callback function that receives current state and context
-   * @returns Unsubscribe function
-   */
-  subscribe(handler) {
-    this.subscriptions.push(handler);
-    return () => this.unsubscribe(handler);
-  }
-  /**
-   * Unsubscribes a handler from state machine updates.
-   * @param handler - The handler function to remove
-   */
-  unsubscribe(handler) {
-    this.subscriptions = this.subscriptions.filter((h) => h !== handler);
-  }
-  /**
-   * Notifies all subscribers of the current state and context.
-   */
-  notifySubscribers() {
-    const state = this.getState();
-    for (const handler of this.subscriptions) {
-      handler(state, this.context);
-    }
   }
   /**
    * Returns the current state of the state machine.

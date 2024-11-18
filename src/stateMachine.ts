@@ -2,13 +2,13 @@ import { EventBus } from './EventBus';
 
 export type StateType = 'initial' | 'sequential' | 'parallel' | 'leaf';
 
-type AfterHandler<C, S extends string> = (
-  ms: number,
-  callback?: ({ context }: { context?: C }) => S,
-) => S;
+type AfterCallback<C, S> = (params: {
+  context: C;
+  updateContext: (context: Partial<C>) => void;
+}) => S;
 
 type EntryHandler<C, S extends string> = (params: {
-  after: AfterHandler<C, S>;
+  after: (ms: number, callback: AfterCallback<C, S>) => S;
   context: C;
   updateContext: (context: Partial<C>) => void;
 }) => void;
@@ -65,7 +65,6 @@ export class StateMachine<E extends MachineEvent, C, S extends string> {
   private type: StateType;
   private onEntry?: EntryHandler<C, S>;
   private onExit?: ExitHandler<C>;
-  private onTransition?: TransitionHandler<S>;
   private activeState: S | null = null;
   private timers: ReturnType<typeof setTimeout>[] = [];
   private parentState?: StateMachine<E, C, S>;
@@ -140,13 +139,16 @@ export class StateMachine<E extends MachineEvent, C, S extends string> {
         this.states[stateName].exit();
       }
     }
+
+    this.onExit?.({
+      context: this.machineContext.context,
+      updateContext: this.machineContext.updateContext,
+    });
   }
 
   transition(stateName: S) {
     if (this.type !== 'sequential') {
-      throw new Error('Transitioning is not allowed in non-sequential states', {
-        cause: stateName,
-      });
+      throw new Error('Transitioning is not allowed in non-sequential states');
     }
 
     // Exit active state
@@ -162,12 +164,15 @@ export class StateMachine<E extends MachineEvent, C, S extends string> {
     }
 
     state.enter();
-    this.onTransition?.(this.activeState as S);
+    this.machineContext.onTransition?.(stateName);
   }
 
-  after(ms: number, callback: (params: { context: C }) => S): S {
+  after(ms: number, callback: AfterCallback<C, S>) {
     const timer = setTimeout(() => {
-      const nextState = callback?.({ context: this.machineContext.context });
+      const nextState = callback?.({
+        context: this.machineContext.context,
+        updateContext: this.machineContext.updateContext,
+      });
 
       if (nextState) {
         this.parentState?.transition(nextState);

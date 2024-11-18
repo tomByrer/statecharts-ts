@@ -1,7 +1,9 @@
 import { Machine } from '../machineFactory';
 import { useState, useEffect } from 'react';
 
-export function useMachine<C extends any>(machine: Machine<C>) {
+export function useMachine<E extends MachineEvent, C, S extends string>(
+  machine: Machine<E, C, S>,
+) {
   const [state, setState] = useState(machine.getState());
   const [context, setContext] = useState(machine.getContext());
 

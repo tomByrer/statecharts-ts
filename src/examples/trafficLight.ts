@@ -1,6 +1,4 @@
-import chalk from 'chalk';
 import { machineFactory } from '../index';
-import cliui from 'cliui';
 
 /*
   Traffic light state machine
@@ -30,13 +28,14 @@ import cliui from 'cliui';
   The state machine uses context to manage the timing of each state and the current status of traffic and pedestrian lights.
  */
 const machine = machineFactory({
+  events: {} as { type: 'STOP' },
   context: {
     traffic: {
       red: false,
       amber: false,
       green: false,
     },
-    pedestrians: {
+    pedestrian: {
       red: false,
       green: false,
       wait: false,
@@ -50,7 +49,7 @@ const machine = machineFactory({
       onEntry: ({ context, updateContext, after }) => {
         updateContext({
           traffic: { red: true, amber: false, green: false },
-          pedestrians: { red: false, green: true, wait: false },
+          pedestrian: { red: false, green: true, wait: false },
         });
         after(context.stopPeriod, () => 'readyGo');
       },
@@ -60,7 +59,7 @@ const machine = machineFactory({
       onEntry: ({ context, updateContext, after }) => {
         updateContext({
           traffic: { red: true, amber: true, green: false },
-          pedestrians: { red: false, green: true, wait: false },
+          pedestrian: { red: true, green: false, wait: false },
         });
         after(context.readyGoPeriod, () => 'go');
       },
@@ -69,13 +68,13 @@ const machine = machineFactory({
       onEntry: ({ updateContext }) => {
         updateContext({
           traffic: { red: false, amber: false, green: true },
-          pedestrians: { red: false, green: true, wait: false },
+          pedestrian: { red: true, green: false, wait: false },
         });
       },
       on: {
-        stop: ({ updateContext }) => {
+        STOP: ({ updateContext }) => {
           updateContext({
-            pedestrians: { red: false, green: true, wait: true },
+            pedestrian: { red: false, green: true, wait: true },
           });
           return 'stop';
         },
@@ -85,67 +84,46 @@ const machine = machineFactory({
       onEntry: ({ context, updateContext, after }) => {
         updateContext({
           traffic: { red: false, amber: true, green: false },
-          pedestrians: { red: false, green: true, wait: false },
+          pedestrian: { red: false, green: true, wait: false },
         });
         after(context.readyStopPeriod, () => 'stop');
       },
     },
+    on: {
+      STOP: ({ context, updateContext }) => {
+        updateContext({ pedestrian: { wait: true } });
+        return 'stop';
+      },
+    },
   },
-  events: {} as { type: 'stop' },
 });
-
-const ui = cliui({ width: 100 });
 
 machine.subscribe((state, context) => {
-  const { pedestrians, traffic } = context;
-  console.log(chalk.green('Transitioned to'), state);
+  const { pedestrian: pedestrians, traffic } = context;
 
-  ui.div(
-    {
-      text: 'Traffic',
-      align: 'center',
-      width: 15,
-      padding: [0, 1, 0, 0],
-    },
-    {
-      text: 'Pedestrians',
-      align: 'center',
-      width: 15,
-      padding: [0, 1, 0, 0],
-    },
-  );
+  const [time] = new Date().toTimeString().split(' ');
+  const trafficLights = [
+    traffic.red && 'Red',
+    traffic.amber && 'Amber',
+    traffic.green && 'Green',
+  ]
+    .filter(Boolean)
+    .join(' + ');
 
-  ui.div(
-    {
-      text: [
-        traffic.red && 'Red',
-        traffic.amber && 'Amber',
-        traffic.green && 'Green',
-      ]
-        .filter(Boolean)
-        .join(' + '),
-      align: 'center',
-      width: 15,
-      padding: [0, 1, 0, 0],
-    },
-    {
-      text: [
-        pedestrians.red && 'Red',
-        pedestrians.green && 'Green',
-        pedestrians.wait && 'Wait',
-      ]
-        .filter(Boolean)
-        .join(' + '),
-      align: 'center',
-      width: 15,
-      padding: [0, 1, 0, 0],
-    },
-  );
+  const pedestriansLights = [
+    pedestrians.red && 'Red',
+    pedestrians.green && 'Green',
+    pedestrians.wait && 'Wait',
+  ]
+    .filter(Boolean)
+    .join(' + ');
 
-  console.log(ui.toString());
+  console.log(`[${time}]`);
+  console.log(`Transitioned to "${state}"`);
+  console.log(`    traffic: ${trafficLights}`);
+  console.log(`pedestrians: ${pedestriansLights}`);
+  console.log('');
 });
-
-machine.start();
 
 // Add keyboard input handling
 process.stdin.setRawMode(true);
@@ -155,14 +133,20 @@ process.stdin.setEncoding('utf8');
 process.stdin.on('data', (key: Buffer) => {
   // ctrl-c ( end of text )
   if (key.toString() === '\u0003') {
-    console.log(chalk.yellow('\nExiting traffic light simulation'));
+    console.log('\nExiting traffic light simulation');
+
     process.exit();
   }
   // space key
   if (key.toString() === ' ') {
-    console.log(chalk.yellow('Sending stop event'));
-    machine.send({ type: 'stop' });
+    console.log('Stop...');
+
+    machine.send({ type: 'STOP' });
   }
 });
 
-console.log(chalk.cyan('Press SPACE to trigger stop, CTRL+C to exit'));
+console.clear();
+console.log('Press SPACE to trigger stop, CTRL+C to exit');
+console.log();
+
+machine.start();

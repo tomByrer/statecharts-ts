@@ -26,15 +26,17 @@ const machine = machineFactory({
         aa: {
           on: {
             // Transition from 'aa' to 'ab' on 'EVENT_A' if the condition is met
-            EVENT_A: ({ transition, context }) => {
+            EVENT_A: ({ context }) => {
               // Only transition if the value of context.x is greater than 0
               if (context.x > 0) {
-                return transition('ab');
+                return 'ab';
               }
               // Log a message if the condition is not met
               console.log(
                 chalk.yellow('Condition not met to transition to ab'),
               );
+
+              return null;
             },
           },
         },
@@ -46,7 +48,7 @@ const machine = machineFactory({
           },
           on: {
             // Transition from 'ab' to 'ac' on 'EVENT_B'
-            EVENT_B: ({ transition }) => transition('ac'),
+            EVENT_B: () => 'ac',
           },
         },
         // State 'ac' of state group 'a'
@@ -71,7 +73,7 @@ const machine = machineFactory({
             baa: {
               on: {
                 // Transition from 'baa' to 'bab' on 'EVENT_C'
-                EVENT_C: ({ transition }) => transition('bab'),
+                EVENT_C: () => 'bab',
               },
             },
             // State 'bab' of state group 'ba'
@@ -93,7 +95,7 @@ const machine = machineFactory({
         bb: {
           on: {
             // Transition from 'bb' to 'bc' on 'EVENT_D'
-            EVENT_D: ({ transition }) => transition('bc'),
+            EVENT_D: () => 'bc',
           },
         },
         // State 'bc' within parallel state 'b'
@@ -124,7 +126,7 @@ const machine = machineFactory({
           },
           on: {
             // Transition from 'ca' to 'cb' on 'EVENT_B'
-            EVENT_B: ({ transition }) => transition('cb'),
+            EVENT_B: () => 'cb',
           },
         },
         // State 'cb' of state group 'c'
@@ -137,7 +139,7 @@ const machine = machineFactory({
           },
           on: {
             // Transition from 'cb' to 'cc' on 'EVENT_C'
-            EVENT_C: ({ transition }) => transition('cc'),
+            EVENT_C: () => 'cc',
           },
         },
         // Final state 'cc' of state group 'c'

@@ -19,6 +19,14 @@
     {
       "type": "node",
       "request": "launch",
+      "name": "Run Example",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["tsx"],
+      "args": ["${workspaceFolder}/src/examples/${input:exampleFile}.ts"],
+    },
+    {
+      "type": "node",
+      "request": "launch",
       "name": "Debug Example",
       "runtimeExecutable": "npx",
       "runtimeArgs": [

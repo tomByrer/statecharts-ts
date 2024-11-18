@@ -10,6 +10,10 @@ import { machineFactory } from '../index';
     - Traffic lights are red, and pedestrian lights are green, allowing pedestrians to cross.
     - The system remains in this state for a specified stopPeriod before transitioning to readyGo.
 
+  - beforeReadyGo:
+    - Traffic lights are red, and pedestrian lights are red, stopping pedestrians from crossing.
+    - The system remains in this state for a specified beforeReadyGoPeriod before transitioning to readyGo.
+
   - readyGo:
     - Traffic lights show red and amber, preparing vehicles to move.
     - Pedestrian lights remain green, but pedestrians should not start crossing.
@@ -25,104 +29,193 @@ import { machineFactory } from '../index';
     - Pedestrian lights remain red.
     - After a readyStopPeriod, the system transitions back to the stop state.
 
+  - afterReadyStop:
+    - Traffic lights are red, and pedestrian lights are red, stopping pedestrians from crossing.
+    - After a readyStopPeriod, the system transitions back to the stop state.
+
   The state machine uses context to manage the timing of each state and the current status of traffic and pedestrian lights.
  */
 const machine = machineFactory({
   events: {} as { type: 'STOP' },
   context: {
-    traffic: {
-      red: false,
-      amber: false,
-      green: false,
-    },
-    pedestrian: {
-      red: false,
-      green: false,
+    lights: {
+      traffic: {
+        red: false,
+        amber: false,
+        green: false,
+      },
+      pedestrian: {
+        red: false,
+        green: false,
+      },
       wait: false,
     },
-    stopPeriod: 10_000,
-    readyGoPeriod: 3_000,
-    readyStopPeriod: 3_000,
+    timeouts: {
+      stop: 3_000,
+      beforeReadyGo: 2_000,
+      readyGo: 3_000,
+      readyStop: 3_000,
+      afterReadyStop: 2_000,
+    },
   },
   states: {
     stop: {
       onEntry: ({ context, updateContext, after }) => {
+        const {
+          lights: { wait },
+          timeouts: { stop },
+        } = context;
         updateContext({
-          traffic: { red: true, amber: false, green: false },
-          pedestrian: { red: false, green: true, wait: false },
+          lights: {
+            traffic: { red: true, amber: false, green: false },
+            pedestrian: { red: false, green: true },
+            wait,
+          },
         });
-        after(context.stopPeriod, () => 'readyGo');
+        after(stop, () => 'readyGo');
+      },
+    },
+    beforeReadyGo: {
+      onEntry: ({ context, updateContext, after }) => {
+        const {
+          timeouts: { beforeReadyGo },
+          lights: { wait },
+        } = context;
+        updateContext({
+          lights: {
+            traffic: { red: true, amber: false, green: false },
+            pedestrian: { red: false, green: true },
+            wait,
+          },
+        });
+        after(beforeReadyGo, () => 'readyGo');
       },
     },
     readyGo: {
       type: 'initial',
       onEntry: ({ context, updateContext, after }) => {
+        const {
+          timeouts: { readyGo },
+          lights: { wait },
+        } = context;
         updateContext({
-          traffic: { red: true, amber: true, green: false },
-          pedestrian: { red: true, green: false, wait: false },
+          lights: {
+            traffic: { red: true, amber: true, green: false },
+            pedestrian: {
+              red: true,
+              green: false,
+            },
+            wait,
+          },
         });
-        after(context.readyGoPeriod, () => 'go');
+        after(readyGo, () => 'go');
       },
     },
     go: {
-      onEntry: ({ updateContext }) => {
+      onEntry: ({ context, updateContext }) => {
+        const {
+          lights: { wait },
+        } = context;
         updateContext({
-          traffic: { red: false, amber: false, green: true },
-          pedestrian: { red: true, green: false, wait: false },
+          lights: {
+            traffic: { red: false, amber: false, green: true },
+            pedestrian: { red: true, green: false },
+            wait,
+          },
         });
       },
       on: {
-        STOP: ({ updateContext }) => {
-          updateContext({
-            pedestrian: { red: false, green: true, wait: true },
-          });
-          return 'stop';
-        },
+        STOP: () => 'wait',
+      },
+    },
+    wait: {
+      onEntry: ({ context, after }) => {
+        const {
+          timeouts: { readyStop },
+        } = context;
+        after(readyStop, () => 'stop');
       },
     },
     readyStop: {
       onEntry: ({ context, updateContext, after }) => {
+        const {
+          timeouts: { readyStop },
+          lights: { wait },
+        } = context;
         updateContext({
-          traffic: { red: false, amber: true, green: false },
-          pedestrian: { red: false, green: true, wait: false },
+          lights: {
+            traffic: { red: false, amber: true, green: false },
+            pedestrian: { red: false, green: true },
+            wait,
+          },
         });
-        after(context.readyStopPeriod, () => 'stop');
+        after(readyStop, () => 'stop');
       },
     },
-    on: {
-      STOP: ({ context, updateContext }) => {
-        updateContext({ pedestrian: { wait: true } });
-        return 'stop';
+    afterReadyStop: {
+      onEntry: ({ context, updateContext, after }) => {
+        const {
+          timeouts: { readyStop },
+          lights: { wait },
+        } = context;
+        updateContext({
+          lights: {
+            traffic: { red: false, amber: true, green: false },
+            pedestrian: { red: false, green: true },
+            wait,
+          },
+        });
+        after(readyStop, () => 'stop');
       },
+    },
+  },
+  on: {
+    STOP: ({ context, updateContext }) => {
+      const {
+        lights: { wait },
+      } = context;
+
+      if (wait) {
+        return null;
+      }
+
+      updateContext({
+        lights: {
+          ...context.lights,
+          wait,
+        },
+      });
+
+      return 'wait';
     },
   },
 });
 
 machine.subscribe((state, context) => {
-  const { pedestrian: pedestrians, traffic } = context;
-
+  const { pedestrian, traffic, wait } = context.lights;
   const [time] = new Date().toTimeString().split(' ');
+
   const trafficLights = [
-    traffic.red && 'Red',
-    traffic.amber && 'Amber',
-    traffic.green && 'Green',
+    traffic.red ? '🔴' : '⚫️',
+    traffic.amber ? '🟠' : '⚫️',
+    traffic.green ? '🟢' : '⚫️',
   ]
     .filter(Boolean)
-    .join(' + ');
+    .join('');
 
-  const pedestriansLights = [
-    pedestrians.red && 'Red',
-    pedestrians.green && 'Green',
-    pedestrians.wait && 'Wait',
+  const pedestrianLights = [
+    pedestrian.red ? '🔴' : '⚫️',
+    pedestrian.green ? '🟢' : '⚫️',
   ]
     .filter(Boolean)
-    .join(' + ');
+    .join('');
 
-  console.log(`[${time}]`);
-  console.log(`Transitioned to "${state}"`);
+  const waitLight = wait ? '🟠' : '⚫️';
+
+  console.log(`[${time}] Transitioned to "${state}"`);
   console.log(`    traffic: ${trafficLights}`);
-  console.log(`pedestrians: ${pedestriansLights}`);
-  console.log('');
+  console.log(`pedestrians: ${pedestrianLights}`);
+  console.log(`       wait: ${waitLight}`);
 });
 
 // Add keyboard input handling
@@ -139,8 +232,6 @@ process.stdin.on('data', (key: Buffer) => {
   }
   // space key
   if (key.toString() === ' ') {
-    console.log('Stop...');
-
     machine.send({ type: 'STOP' });
   }
 });

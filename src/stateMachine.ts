@@ -14,11 +14,11 @@ type EntryHandler<C, S extends string> = (params: {
 }) => void;
 
 type ExitHandler<C> = (params: {
-  context?: C;
+  context: C;
   updateContext: (context: Partial<C>) => void;
 }) => void;
 
-type TransitionHandler<S> = (activeStates: S) => void;
+type TransitionHandler<C> = (machineState: any, context: C) => void;
 
 export type MachineEvent = {
   type: string;
@@ -29,7 +29,7 @@ type EventHandler<E extends MachineEvent, C, S extends string> = (params: {
   event: E;
   context: C;
   updateContext: (context: Partial<C>) => void;
-}) => S;
+}) => S | null;
 
 export type MachineConfig<E extends MachineEvent, C, S extends string> = {
   events?: E;
@@ -54,7 +54,7 @@ export type MachineContext<E extends MachineEvent, C, S extends string> = {
   context: C;
   updateContext: (context: Partial<C>) => void;
   eventBus: EventBus<E>;
-  onTransition?: TransitionHandler<S>;
+  onTransition?: TransitionHandler<C>;
 };
 
 export class StateMachine<E extends MachineEvent, C, S extends string> {
@@ -71,6 +71,7 @@ export class StateMachine<E extends MachineEvent, C, S extends string> {
 
   private config: MachineConfig<E, C, S>;
   private machineContext: MachineContext<E, C, S>;
+  private eventUnsubscribers: (() => void)[] = [];
 
   constructor(
     config: MachineConfig<E, C, S>,
@@ -128,6 +129,33 @@ export class StateMachine<E extends MachineEvent, C, S extends string> {
     if (this.type === 'sequential') {
       this.transition(this.activeState as S);
     }
+
+    if (this.config.on) {
+      for (const eventType in this.config.on) {
+        const callback = this.config.on[eventType as E['type']];
+
+        if (callback) {
+          const handler = (event: E) => {
+            const newState = callback({
+              event: event as Extract<E, { type: typeof eventType }>,
+              context: this.machineContext.context,
+              updateContext: this.machineContext.updateContext,
+            });
+
+            if (newState) {
+              this.parentState?.transition(newState);
+            }
+          };
+
+          const eventSubscription = this.machineContext.eventBus.on(
+            eventType,
+            handler,
+          );
+
+          this.eventUnsubscribers.push(eventSubscription);
+        }
+      }
+    }
   }
 
   exit(): void {
@@ -139,6 +167,11 @@ export class StateMachine<E extends MachineEvent, C, S extends string> {
         this.states[stateName].exit();
       }
     }
+
+    for (const unsubscribe of this.eventUnsubscribers) {
+      unsubscribe();
+    }
+    this.eventUnsubscribers = [];
 
     this.onExit?.({
       context: this.machineContext.context,
@@ -164,7 +197,7 @@ export class StateMachine<E extends MachineEvent, C, S extends string> {
     }
 
     state.enter();
-    this.machineContext.onTransition?.(stateName);
+    this.machineContext.onTransition?.(stateName, this.machineContext.context);
   }
 
   after(ms: number, callback: AfterCallback<C, S>) {

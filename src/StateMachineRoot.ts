@@ -14,7 +14,7 @@ export class StateMachineRoot<E extends MachineEvent, C, S extends string> {
   constructor(rootConfig: RootStateDefinition<E, C, S>) {
     const { context, states, on, onEntry, onExit, type } = rootConfig;
 
-    this.context = context;
+    this.context = this.getUpdateContext(context);
     this.eventBus = new EventBus();
     this.state = new StateMachine<E, C, S>(
       { states, on, onEntry, onExit, type },
@@ -26,6 +26,13 @@ export class StateMachineRoot<E extends MachineEvent, C, S extends string> {
       },
     );
     this.subscriptions = [];
+  }
+
+  getUpdateContext(newContext?: Partial<C>) {
+    if (newContext) {
+      this.context = { ...this.context, ...newContext };
+    }
+    return this.context;
   }
 
   subscribe(handler: StateChangeHandler<S, C>) {
@@ -57,7 +64,7 @@ export class StateMachineRoot<E extends MachineEvent, C, S extends string> {
   }
 
   updateContext(context: Partial<C>) {
-    this.context = structuredClone({ ...this.context, ...context });
+    Object.assign(this.context as Required<C>, context);
   }
 
   getState() {

@@ -13,7 +13,7 @@ const machine = machineFactory({
         updateContext({ cycles: context.cycles + 1 });
       },
       on: {
-        TOGGLE: ({ transition }) => transition('on'),
+        TOGGLE: () => 'on',
       },
     },
     on: {
@@ -21,7 +21,7 @@ const machine = machineFactory({
         updateContext({ cycles: context.cycles + 1 });
       },
       on: {
-        TOGGLE: ({ transition }) => transition('off'),
+        TOGGLE: () => 'off',
       },
     },
   },

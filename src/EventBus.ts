@@ -1,11 +1,13 @@
-export class EventBus<E extends MachineEvent> {
+export class EventBus<E extends MachineEvent, T = string> {
   private subscriptions: ((event: E) => void)[] = [];
 
-  on(event: E, callback: (event: E) => void) {
+  on(eventType: T, callback: (event: E) => void) {
     this.subscriptions.push(callback);
+
+    return () => this.off(eventType, callback);
   }
 
-  off(event: E, callback: (event: E) => void) {
+  off(eventType: T, callback: (event: E) => void) {
     this.subscriptions = this.subscriptions.filter((c) => c !== callback);
   }
 
@@ -17,3 +19,23 @@ export class EventBus<E extends MachineEvent> {
     this.subscriptions = [];
   }
 }
+
+type TestEvent =
+  | {
+      type: 'ALPHA';
+      payload: {
+        reason: string;
+      };
+    }
+  | {
+      type: 'BETA';
+      payload: {
+        count: number;
+      };
+    };
+
+const eventBus = new EventBus<TestEvent>();
+
+eventBus.on('ALPHA', (event) => {
+  console.log(event);
+});

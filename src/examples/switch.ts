@@ -6,7 +6,7 @@ const machine = machineFactory({
   states: {
     a: {
       onEntry: () => {
-        console.log('off');
+        console.log('a');
       },
       on: {
         TOGGLE: () => 'b',
@@ -14,7 +14,7 @@ const machine = machineFactory({
     },
     b: {
       onEntry: () => {
-        console.log('on');
+        console.log('b');
       },
       on: {
         TOGGLE: () => 'c',

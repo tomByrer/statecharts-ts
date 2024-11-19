@@ -11,7 +11,10 @@ export class EventBus<E extends MachineEvent, T = string> {
       this.subscriptions.set(eventType, new Set());
     }
 
-    this.subscriptions.get(eventType)!.add(callback);
+    this.subscriptions.set(
+      eventType,
+      new Set([...this.subscriptions.get(eventType)!, callback]),
+    );
 
     return () => this.off(eventType, callback);
   }
@@ -21,11 +24,12 @@ export class EventBus<E extends MachineEvent, T = string> {
   }
 
   send(event: E) {
-    // this.subscriptions.get('*')?.forEach((callback) => callback(event));
-    const callbacks = this.subscriptions.get(event.type as T);
+    for (const callback of this.subscriptions.get('*') ?? []) {
+      callback(event);
+    }
 
-    if (callbacks) {
-      callbacks.forEach((callback) => callback(event));
+    for (const callback of this.subscriptions.get(event.type as T) ?? []) {
+      callback(event);
     }
   }
 

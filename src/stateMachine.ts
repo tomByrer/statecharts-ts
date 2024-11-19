@@ -157,10 +157,12 @@ export class StateMachine<E extends MachineEvent, S extends string> {
     for (const unsubscribe of this.eventUnsubscribers) {
       unsubscribe();
     }
+
     this.eventUnsubscribers = [];
 
     if (this.type === 'sequential' && this.activeState) {
       const state = this.states[this.activeState as S];
+
       state.exit();
     } else if (this.type === 'parallel') {
       for (const stateName in this.states) {
@@ -186,11 +188,13 @@ export class StateMachine<E extends MachineEvent, S extends string> {
 
     // Enter the new state
     const state = this.states[stateName];
+
     if (!state) {
       throw new Error(`State ${stateName} not found`);
     }
 
     state.enter();
+
     this.machineContext.onTransition?.(this.getState());
   }
 

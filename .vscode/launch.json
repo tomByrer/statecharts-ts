@@ -33,7 +33,7 @@
         "tsx",
         "--inspect"
       ],
-      "args": ["${workspaceFolder}/src/examples/${input:file}.ts"],
+      "args": ["${workspaceFolder}/src/examples/${input:exampleFile}.ts"],
       "skipFiles": [
         "<node_internals>/**"
       ],
@@ -44,7 +44,8 @@
       "resolveSourceMapLocations": [
         "${workspaceFolder}/**",
         "!**/node_modules/**"
-      ]
+      ],
+      "console": "integratedTerminal"
     },
     {
       "type": "node",
@@ -75,7 +76,7 @@
       "id": "exampleFile",
       "type": "pickString",
       "description": "Which example would you like to debug?",
-      "options": ["basic", "complex", "djDeck", "trafficLight"]
+      "options": ["basic", "complex", "djDeck", "trafficLight", "switch"]
     }
   ]
 }

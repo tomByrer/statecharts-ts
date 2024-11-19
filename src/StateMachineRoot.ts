@@ -22,6 +22,10 @@ export class StateMachineRoot<E extends MachineEvent, S extends string> {
       },
     );
     this.subscriptions = [];
+
+    this.eventBus.on('*', (event) => {
+      console.log('Event:', event);
+    });
   }
 
   subscribe(handler: StateChangeHandler<S>) {
@@ -32,7 +36,7 @@ export class StateMachineRoot<E extends MachineEvent, S extends string> {
     this.subscriptions = this.subscriptions.filter((h) => h !== handler);
   }
 
-  notifySubscribers(state: S) {
+  notifySubscribers(state: MachineState<S>) {
     for (const handler of this.subscriptions) {
       handler(state);
     }

@@ -109,7 +109,7 @@ export class StateMachine<E extends MachineEvent, S extends string> {
         }
       }
 
-      this.activeState = initialState;
+      this.activeState = initialState ?? (stateKeys[0] as S);
     }
   }
 
@@ -118,10 +118,6 @@ export class StateMachine<E extends MachineEvent, S extends string> {
       this.onEntry({
         after: this.after.bind(this),
       });
-    }
-
-    if (this.type === 'sequential') {
-      this.parentState?.transition(this.activeState as S);
     }
 
     if (this.config.on) {
@@ -148,9 +144,21 @@ export class StateMachine<E extends MachineEvent, S extends string> {
         }
       }
     }
+
+    if (this.type === 'sequential') {
+      const state = this.states[this.activeState as S];
+
+      state.enter();
+    }
   }
 
   exit(): void {
+    // Clear event handlers before exiting state
+    for (const unsubscribe of this.eventUnsubscribers) {
+      unsubscribe();
+    }
+    this.eventUnsubscribers = [];
+
     if (this.type === 'sequential' && this.activeState) {
       const state = this.states[this.activeState as S];
       state.exit();
@@ -159,11 +167,6 @@ export class StateMachine<E extends MachineEvent, S extends string> {
         this.states[stateName].exit();
       }
     }
-
-    for (const unsubscribe of this.eventUnsubscribers) {
-      unsubscribe();
-    }
-    this.eventUnsubscribers = [];
 
     this.onExit?.();
   }
@@ -178,15 +181,17 @@ export class StateMachine<E extends MachineEvent, S extends string> {
       this.states[this.activeState].exit();
     }
 
+    // Update active state before entering new state
+    this.activeState = stateName;
+
     // Enter the new state
     const state = this.states[stateName];
-
     if (!state) {
       throw new Error(`State ${stateName} not found`);
     }
 
     state.enter();
-    this.machineContext.onTransition?.(stateName);
+    this.machineContext.onTransition?.(this.getState());
   }
 
   after(ms: number, callback: AfterCallback<S>) {

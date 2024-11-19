@@ -33,166 +33,106 @@ import { machineFactory } from '../index';
     - Traffic lights are red, and pedestrian lights are red, stopping pedestrians from crossing.
     - After a readyStopPeriod, the system transitions back to the stop state.
 
-  The state machine uses context to manage the timing of each state and the current status of traffic and pedestrian lights.
  */
+
+const lights = {
+  traffic: {
+    red: false,
+    amber: false,
+    green: false,
+  },
+  pedestrian: {
+    red: false,
+    green: false,
+  },
+  wait: false,
+};
+
+const timeouts = {
+  stop: 3_000,
+  beforeReadyGo: 2_000,
+  readyGo: 3_000,
+  readyStop: 3_000,
+  afterReadyStop: 2_000,
+};
+
 const machine = machineFactory({
   events: {} as { type: 'STOP' },
-  context: {
-    lights: {
-      traffic: {
-        red: false,
-        amber: false,
-        green: false,
-      },
-      pedestrian: {
-        red: false,
-        green: false,
-      },
-      wait: false,
-    },
-    timeouts: {
-      stop: 3_000,
-      beforeReadyGo: 2_000,
-      readyGo: 3_000,
-      readyStop: 3_000,
-      afterReadyStop: 2_000,
-    },
-  },
   states: {
     stop: {
-      onEntry: ({ context, updateContext, after }) => {
-        const {
-          lights: { wait },
-          timeouts: { stop },
-        } = context;
-        updateContext({
-          lights: {
-            traffic: { red: true, amber: false, green: false },
-            pedestrian: { red: false, green: true },
-            wait,
-          },
-        });
-        after(stop, () => 'readyGo');
+      onEntry: ({ after }) => {
+        lights.traffic = { red: true, amber: false, green: false };
+        lights.pedestrian = { red: false, green: true };
+
+        after(timeouts.stop, () => 'readyGo');
       },
     },
     beforeReadyGo: {
-      onEntry: ({ context, updateContext, after }) => {
-        const {
-          timeouts: { beforeReadyGo },
-          lights: { wait },
-        } = context;
-        updateContext({
-          lights: {
-            traffic: { red: true, amber: false, green: false },
-            pedestrian: { red: false, green: true },
-            wait,
-          },
-        });
-        after(beforeReadyGo, () => 'readyGo');
+      onEntry: ({ after }) => {
+        lights.traffic = { red: true, amber: false, green: false };
+        lights.pedestrian = { red: false, green: true };
+
+        after(timeouts.beforeReadyGo, () => 'readyGo');
       },
     },
     readyGo: {
       type: 'initial',
-      onEntry: ({ context, updateContext, after }) => {
-        const {
-          timeouts: { readyGo },
-          lights: { wait },
-        } = context;
-        updateContext({
-          lights: {
-            traffic: { red: true, amber: true, green: false },
-            pedestrian: {
-              red: true,
-              green: false,
-            },
-            wait,
-          },
-        });
-        after(readyGo, () => 'go');
+      onEntry: ({ after }) => {
+        lights.traffic = { red: true, amber: true, green: false };
+        lights.pedestrian = {
+          red: true,
+          green: false,
+        };
+
+        after(timeouts.readyGo, () => 'go');
       },
     },
     go: {
-      onEntry: ({ context, updateContext }) => {
-        const {
-          lights: { wait },
-        } = context;
-        updateContext({
-          lights: {
-            traffic: { red: false, amber: false, green: true },
-            pedestrian: { red: true, green: false },
-            wait,
-          },
-        });
+      onEntry: () => {
+        lights.traffic = { red: false, amber: false, green: true };
+        lights.pedestrian = { red: true, green: false };
       },
       on: {
         STOP: () => 'wait',
       },
     },
     wait: {
-      onEntry: ({ context, after }) => {
-        const {
-          timeouts: { readyStop },
-        } = context;
-        after(readyStop, () => 'stop');
+      onEntry: ({ after }) => {
+        after(timeouts.readyStop, () => 'stop');
       },
     },
     readyStop: {
-      onEntry: ({ context, updateContext, after }) => {
-        const {
-          timeouts: { readyStop },
-          lights: { wait },
-        } = context;
-        updateContext({
-          lights: {
-            traffic: { red: false, amber: true, green: false },
-            pedestrian: { red: false, green: true },
-            wait,
-          },
-        });
-        after(readyStop, () => 'stop');
+      onEntry: ({ after }) => {
+        lights.traffic = { red: false, amber: true, green: false };
+        lights.pedestrian = { red: false, green: true };
+
+        after(timeouts.readyStop, () => 'stop');
       },
     },
     afterReadyStop: {
-      onEntry: ({ context, updateContext, after }) => {
-        const {
-          timeouts: { readyStop },
-          lights: { wait },
-        } = context;
-        updateContext({
-          lights: {
-            traffic: { red: false, amber: true, green: false },
-            pedestrian: { red: false, green: true },
-            wait,
-          },
-        });
-        after(readyStop, () => 'stop');
+      onEntry: ({ after }) => {
+        lights.traffic = { red: false, amber: true, green: false };
+        lights.pedestrian = { red: false, green: true };
+
+        after(timeouts.readyStop, () => 'stop');
       },
     },
   },
   on: {
-    STOP: ({ context, updateContext }) => {
-      const {
-        lights: { wait },
-      } = context;
-
-      if (wait) {
+    STOP: () => {
+      if (lights.wait) {
         return null;
       }
 
-      updateContext({
-        lights: {
-          ...context.lights,
-          wait,
-        },
-      });
+      lights.wait = true;
 
       return 'wait';
     },
   },
 });
 
-machine.subscribe((state, context) => {
-  const { pedestrian, traffic, wait } = context.lights;
+machine.subscribe((state) => {
+  const { pedestrian, traffic, wait } = lights;
   const [time] = new Date().toTimeString().split(' ');
 
   const trafficLights = [
@@ -224,11 +164,13 @@ process.stdin.resume();
 process.stdin.setEncoding('utf8');
 
 process.stdin.on('data', (key: Buffer) => {
+  // ctrl+c
   if (key.toString() === '\u0003') {
     console.log('Exiting...');
     machine.stop();
     process.exit(0);
   }
+
   // space key
   if (key.toString() === ' ') {
     machine.send({ type: 'STOP' });
@@ -239,3 +181,5 @@ console.clear();
 console.log('Press SPACE to trigger stop, ctrl+C to exit\n');
 
 machine.start();
+
+console.log(machine.getState());

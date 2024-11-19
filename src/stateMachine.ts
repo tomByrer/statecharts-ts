@@ -2,46 +2,38 @@ import { EventBus } from './EventBus';
 
 export type StateType = 'initial' | 'sequential' | 'parallel' | 'leaf';
 
-type AfterCallback<C, S> = (params: {
-  context: C;
-  updateContext: (context: Partial<C>) => void;
-}) => S;
+type AfterCallback<S> = () => S;
 
-type EntryHandler<C, S extends string> = (params: {
-  after: (ms: number, callback: AfterCallback<C, S>) => S;
-  context: C;
-  updateContext: (context: Partial<C>) => void;
+type EntryHandler<S extends string> = (params: {
+  after: (ms: number, callback: AfterCallback<S>) => S;
 }) => void;
 
-type ExitHandler<C> = (params: {
-  context: C;
-  updateContext: (context: Partial<C>) => void;
-}) => void;
+type ExitHandler = () => void;
 
-type TransitionHandler<C> = (machineState: any, context: C) => void;
+type TransitionHandler<S extends string> = (
+  machineState: MachineState<S>,
+) => void;
 
 export type MachineEvent = {
   type: string;
   data?: unknown;
 };
 
-type EventHandler<E extends MachineEvent, C, S extends string> = (params: {
+type EventHandler<E extends MachineEvent, S extends string> = (params: {
   event: E;
-  context: C;
-  updateContext: (context: Partial<C>) => void;
 }) => S | null;
 
-export type MachineConfig<E extends MachineEvent, C, S extends string> = {
+export type MachineConfig<E extends MachineEvent, S extends string> = {
   events?: E;
   type?: StateType;
   states?: Partial<{
-    [K in S]: MachineConfig<E, C, S>;
+    [K in S]: MachineConfig<E, S>;
   }>;
   on?: {
-    [K in E['type']]?: EventHandler<Extract<E, { type: K }>, C, S>;
+    [K in E['type']]?: EventHandler<Extract<E, { type: K }>, S>;
   };
-  onEntry?: EntryHandler<C, S>;
-  onExit?: ExitHandler<C>;
+  onEntry?: EntryHandler<S>;
+  onExit?: ExitHandler;
 };
 
 // export type StateObject = {
@@ -50,37 +42,41 @@ export type MachineConfig<E extends MachineEvent, C, S extends string> = {
 
 // export type MachineState = StateObject | string | null;
 
-export type MachineContext<E extends MachineEvent, C, S extends string> = {
-  context: C;
-  updateContext: (context: Partial<C>) => void;
+export type MachineContext<E extends MachineEvent, S extends string> = {
   eventBus: EventBus<E>;
-  onTransition?: TransitionHandler<C>;
+  onTransition?: TransitionHandler<S>;
 };
 
-export class StateMachine<E extends MachineEvent, C, S extends string> {
-  private states: Record<S, StateMachine<E, C, S>> = {} as Record<
+export type MachineState<S extends string> =
+  | {
+      [K in S]?: MachineState<S> | null;
+    }
+  | null;
+
+export class StateMachine<E extends MachineEvent, S extends string> {
+  private states: Record<S, StateMachine<E, S>> = {} as Record<
     S,
-    StateMachine<E, C, S>
+    StateMachine<E, S>
   >;
   private type: StateType;
-  private onEntry?: EntryHandler<C, S>;
-  private onExit?: ExitHandler<C>;
+  private onEntry?: EntryHandler<S>;
+  private onExit?: ExitHandler;
   private activeState: S | null = null;
   private timers: ReturnType<typeof setTimeout>[] = [];
-  private parentState?: StateMachine<E, C, S>;
+  private parentState?: StateMachine<E, S>;
 
-  private config: MachineConfig<E, C, S>;
-  private machineContext: MachineContext<E, C, S>;
+  private config: MachineConfig<E, S>;
+  private machineContext: MachineContext<E, S>;
   private eventUnsubscribers: (() => void)[] = [];
 
   constructor(
-    config: MachineConfig<E, C, S>,
-    machineContext: MachineContext<E, C, S>,
-    parentState?: StateMachine<E, C, S>,
+    config: MachineConfig<E, S>,
+    machineContext: MachineContext<E, S>,
+    parentState?: StateMachine<E, S>,
   ) {
     this.config = config;
     this.type = config.states ? (config.type ?? 'sequential') : 'leaf';
-    this.onEntry = config.onEntry as EntryHandler<C, S>;
+    this.onEntry = config.onEntry as EntryHandler<S>;
     this.onExit = config.onExit;
     this.machineContext = machineContext;
     this.parentState = parentState;
@@ -94,7 +90,7 @@ export class StateMachine<E extends MachineEvent, C, S extends string> {
       for (const stateName of stateKeys) {
         const stateConfig = this.config.states[stateName as S]!;
         // Create the state
-        this.states[stateName as S] = new StateMachine<E, C, S>(
+        this.states[stateName as S] = new StateMachine<E, S>(
           stateConfig,
           this.machineContext,
           this,
@@ -121,13 +117,11 @@ export class StateMachine<E extends MachineEvent, C, S extends string> {
     if (this.onEntry) {
       this.onEntry({
         after: this.after.bind(this),
-        context: this.machineContext.context,
-        updateContext: this.machineContext.updateContext,
       });
     }
 
     if (this.type === 'sequential') {
-      this.transition(this.activeState as S);
+      this.parentState?.transition(this.activeState as S);
     }
 
     if (this.config.on) {
@@ -138,8 +132,6 @@ export class StateMachine<E extends MachineEvent, C, S extends string> {
           const handler = (event: E) => {
             const newState = callback({
               event: event as Extract<E, { type: typeof eventType }>,
-              context: this.machineContext.context,
-              updateContext: this.machineContext.updateContext,
             });
 
             if (newState) {
@@ -159,7 +151,7 @@ export class StateMachine<E extends MachineEvent, C, S extends string> {
   }
 
   exit(): void {
-    if (this.type === 'sequential') {
+    if (this.type === 'sequential' && this.activeState) {
       const state = this.states[this.activeState as S];
       state.exit();
     } else if (this.type === 'parallel') {
@@ -173,10 +165,7 @@ export class StateMachine<E extends MachineEvent, C, S extends string> {
     }
     this.eventUnsubscribers = [];
 
-    this.onExit?.({
-      context: this.machineContext.context,
-      updateContext: this.machineContext.updateContext,
-    });
+    this.onExit?.();
   }
 
   transition(stateName: S) {
@@ -197,15 +186,12 @@ export class StateMachine<E extends MachineEvent, C, S extends string> {
     }
 
     state.enter();
-    this.machineContext.onTransition?.(stateName, this.machineContext.context);
+    this.machineContext.onTransition?.(stateName);
   }
 
-  after(ms: number, callback: AfterCallback<C, S>) {
+  after(ms: number, callback: AfterCallback<S>) {
     const timer = setTimeout(() => {
-      const nextState = callback?.({
-        context: this.machineContext.context,
-        updateContext: this.machineContext.updateContext,
-      });
+      const nextState = callback?.();
 
       if (nextState) {
         this.parentState?.transition(nextState);
@@ -221,7 +207,24 @@ export class StateMachine<E extends MachineEvent, C, S extends string> {
     this.machineContext.eventBus.send(event);
   }
 
-  getState() {
+  getState(): MachineState<S> {
+    if (this.states) {
+      if (this.type === 'sequential') {
+        return {
+          [this.activeState as S]:
+            this.states[this.activeState as S].getState(),
+        } as MachineState<S>;
+      }
+
+      const stateEntries: [S, MachineState<S>][] = [];
+
+      for (const stateName in this.states) {
+        stateEntries.push([stateName, this.states[stateName].getState()]);
+      }
+
+      return Object.fromEntries(stateEntries) as MachineState<S>;
+    }
+
     return null;
   }
 }

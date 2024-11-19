@@ -3,20 +3,16 @@ import { StateMachineRoot } from './StateMachineRoot';
 
 export type RootStateDefinition<
   E extends MachineEvent,
-  C,
   S extends string,
-> = MachineConfig<E, C, S> & {
-  context: C;
-};
+> = MachineConfig<E, S>;
 
-export function machineFactory<E extends MachineEvent, C, S extends string>(
-  config: RootStateDefinition<E, C, S>,
+export function machineFactory<E extends MachineEvent, S extends string>(
+  config: RootStateDefinition<E, S>,
 ) {
   return new StateMachineRoot(config);
 }
 
 export type Machine<
   E extends MachineEvent,
-  C,
   S extends string,
-> = StateMachineRoot<E, C, S>;
+> = StateMachineRoot<E, S>;

@@ -224,11 +224,10 @@ process.stdin.resume();
 process.stdin.setEncoding('utf8');
 
 process.stdin.on('data', (key: Buffer) => {
-  // ctrl-c ( end of text )
   if (key.toString() === '\u0003') {
-    console.log('\nExiting traffic light simulation');
-
-    process.exit();
+    console.log('Exiting...');
+    machine.stop();
+    process.exit(0);
   }
   // space key
   if (key.toString() === ' ') {
@@ -237,7 +236,6 @@ process.stdin.on('data', (key: Buffer) => {
 });
 
 console.clear();
-console.log('Press SPACE to trigger stop, CTRL+C to exit');
-console.log();
+console.log('Press SPACE to trigger stop, ctrl+C to exit\n');
 
 machine.start();

@@ -33,7 +33,7 @@
         "tsx",
         "--inspect"
       ],
-      "args": ["${workspaceFolder}/src/examples/${input:exampleFile}.ts"],
+      "args": ["${workspaceFolder}/src/examples/${input:file}.ts"],
       "skipFiles": [
         "<node_internals>/**"
       ],

@@ -19,6 +19,7 @@
     "example:complex": "tsx --watch --inspect src/examples/complex.ts",
     "example:djDeck": "tsx --watch --inspect src/examples/djDeck.ts",
     "example:trafficLight": "tsx --watch --inspect src/examples/trafficLight.ts",
+    "example:switch": "tsx --watch --inspect src/examples/switch.ts",
     "prepare": "npm run build"
   },
   "author": "Michael Beswick",

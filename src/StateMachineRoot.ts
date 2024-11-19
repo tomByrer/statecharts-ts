@@ -1,26 +1,22 @@
 import { EventBus } from './EventBus';
 import { RootStateDefinition } from './machineFactory';
-import { StateMachine, MachineEvent } from './StateMachine';
+import { StateMachine, MachineEvent, MachineState } from './StateMachine';
 
-type StateChangeHandler<M, C> = (state: M, context: C) => void;
+type StateChangeHandler<S extends string> = (state: MachineState<S>) => void;
 
-export class StateMachineRoot<E extends MachineEvent, C, S extends string> {
-  private subscriptions: StateChangeHandler<S, C>[] = [];
-  private state: StateMachine<E, C, S>;
-  private context: C;
+export class StateMachineRoot<E extends MachineEvent, S extends string> {
+  private subscriptions: StateChangeHandler<S>[] = [];
+  private state: StateMachine<E, S>;
   private isRunning = false;
   private eventBus: EventBus<E>;
 
-  constructor(rootConfig: RootStateDefinition<E, C, S>) {
-    const { context, states, on, onEntry, onExit, type } = rootConfig;
+  constructor(rootConfig: RootStateDefinition<E, S>) {
+    const { states, on, onEntry, onExit, type } = rootConfig;
 
-    this.context = this.getUpdateContext(context);
     this.eventBus = new EventBus();
-    this.state = new StateMachine<E, C, S>(
+    this.state = new StateMachine<E, S>(
       { states, on, onEntry, onExit, type },
       {
-        context: this.context,
-        updateContext: this.updateContext.bind(this),
         eventBus: this.eventBus,
         onTransition: this.notifySubscribers.bind(this),
       },
@@ -28,24 +24,17 @@ export class StateMachineRoot<E extends MachineEvent, C, S extends string> {
     this.subscriptions = [];
   }
 
-  getUpdateContext(newContext?: Partial<C>) {
-    if (newContext) {
-      this.context = { ...this.context, ...newContext };
-    }
-    return this.context;
-  }
-
-  subscribe(handler: StateChangeHandler<S, C>) {
+  subscribe(handler: StateChangeHandler<S>) {
     this.subscriptions.push(handler);
   }
 
-  unsubscribe(handler: StateChangeHandler<S, C>) {
+  unsubscribe(handler: StateChangeHandler<S>) {
     this.subscriptions = this.subscriptions.filter((h) => h !== handler);
   }
 
   notifySubscribers(state: S) {
     for (const handler of this.subscriptions) {
-      handler(state, this.context);
+      handler(state);
     }
   }
 
@@ -63,16 +52,8 @@ export class StateMachineRoot<E extends MachineEvent, C, S extends string> {
     this.state.exit();
   }
 
-  updateContext(context: Partial<C>) {
-    Object.assign(this.context as Required<C>, context);
-  }
-
   getState() {
     return this.state.getState();
-  }
-
-  getContext() {
-    return this.context;
   }
 
   send(event: E) {

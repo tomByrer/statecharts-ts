@@ -7,14 +7,8 @@ export class EventBus<E extends MachineEvent, T = string> {
   }
 
   on(eventType: T, callback: (event: E) => void) {
-    if (!this.subscriptions.has(eventType)) {
-      this.subscriptions.set(eventType, new Set());
-    }
-
-    this.subscriptions.set(
-      eventType,
-      new Set([...this.subscriptions.get(eventType)!, callback]),
-    );
+    const currentSet = this.subscriptions.get(eventType) || new Set();
+    this.subscriptions.set(eventType, new Set([...currentSet, callback]));
 
     return () => this.off(eventType, callback);
   }

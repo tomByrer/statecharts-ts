@@ -5,27 +5,27 @@ const machine = machineFactory({
   events: {} as { type: 'TOGGLE' },
   states: {
     a: {
-      onEntry: () => {
-        console.log('a');
-      },
-      on: {
-        TOGGLE: () => 'b',
+      states: {
+        a1: {
+          on: {
+            TOGGLE: () => 'a2',
+          },
+        },
+        a2: {
+          on: {
+            TOGGLE: () => 'b',
+          },
+        },
       },
     },
     b: {
-      onEntry: () => {
-        console.log('b');
-      },
       on: {
         TOGGLE: () => 'c',
       },
     },
     c: {
-      onEntry: () => {
-        console.log('c');
-      },
       on: {
-        TOGGLE: () => 'c',
+        TOGGLE: () => 'a1',
       },
     },
   },

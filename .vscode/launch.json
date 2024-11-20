@@ -6,7 +6,7 @@
       "request": "launch",
       "name": "Debug Current File",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["tsx"],
+      "runtimeArgs": ["tsx", "--preserve-symlinks"],
       "args": ["${file}"],
       "skipFiles": ["<node_internals>/**"],
       "outFiles": ["${workspaceFolder}/**/*.js"],
@@ -21,26 +21,19 @@
       "request": "launch",
       "name": "Run Example",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["tsx"],
-      "args": ["${workspaceFolder}/src/examples/${input:exampleFile}.ts"],
+      "runtimeArgs": ["tsx", "--watch", "--preserve-symlinks"],
+      "args": ["${workspaceFolder}/src/examples/${input:exampleFile}.ts"]
     },
     {
       "type": "node",
       "request": "launch",
       "name": "Debug Example",
       "runtimeExecutable": "npx",
-      "runtimeArgs": [
-        "tsx",
-        "--inspect"
-      ],
+      "runtimeArgs": ["tsx", "--inspect", "--watch", "--preserve-symlinks"],
       "args": ["${workspaceFolder}/src/examples/${input:exampleFile}.ts"],
-      "skipFiles": [
-        "<node_internals>/**"
-      ],
+      "skipFiles": ["<node_internals>/**"],
       "sourceMaps": true,
-      "outFiles": [
-        "${workspaceFolder}/**/*.js"
-      ],
+      "outFiles": ["${workspaceFolder}/**/*.js"],
       "resolveSourceMapLocations": [
         "${workspaceFolder}/**",
         "!**/node_modules/**"
@@ -76,7 +69,7 @@
       "id": "exampleFile",
       "type": "pickString",
       "description": "Which example would you like to debug?",
-      "options": ["basic", "complex", "djDeck", "trafficLight", "switch"]
+      "options": ["basic", "complex", "djDeck", "toggle", "trafficLight"]
     }
   ]
 }

@@ -1,6 +1,15 @@
 import { EventBus } from './EventBus';
-import { RootStateDefinition } from './machineFactory';
-import { StateMachine, MachineEvent, MachineState } from './StateMachine';
+import {
+  StateMachine,
+  MachineEvent,
+  MachineState,
+  MachineConfig,
+} from './StateMachine';
+
+export type RootStateDefinition<
+  E extends MachineEvent,
+  S extends string,
+> = MachineConfig<E, S>;
 
 type StateChangeHandler<S extends string> = (state: MachineState<S>) => void;
 

@@ -50,6 +50,7 @@ export class StateMachineRoot<E extends MachineEvent, S extends string> {
 
     this.state.enter();
     this.isRunning = true;
+    this.notifySubscribers();
   }
 
   public stop() {

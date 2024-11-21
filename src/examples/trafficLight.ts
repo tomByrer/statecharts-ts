@@ -35,19 +35,6 @@ import { machineFactory } from '../index';
 
  */
 
-const lights = {
-  traffic: {
-    red: false,
-    amber: false,
-    green: false,
-  },
-  pedestrian: {
-    red: false,
-    green: false,
-  },
-  wait: false,
-};
-
 const timeouts = {
   stop: 3_000,
   beforeReadyGo: 2_000,
@@ -56,42 +43,29 @@ const timeouts = {
   afterReadyStop: 2_000,
 };
 
+let waiting = false;
+
 const machine = machineFactory({
   events: {} as { type: 'STOP' },
   states: {
     stop: {
       onEntry: ({ after }) => {
-        lights.traffic = { red: true, amber: false, green: false };
-        lights.pedestrian = { red: false, green: true };
-
         after(timeouts.stop, () => 'readyGo');
       },
     },
     beforeReadyGo: {
       onEntry: ({ after }) => {
-        lights.traffic = { red: true, amber: false, green: false };
-        lights.pedestrian = { red: false, green: true };
-
         after(timeouts.beforeReadyGo, () => 'readyGo');
       },
     },
     readyGo: {
       type: 'initial',
       onEntry: ({ after }) => {
-        lights.traffic = { red: true, amber: true, green: false };
-        lights.pedestrian = {
-          red: true,
-          green: false,
-        };
-
         after(timeouts.readyGo, () => 'go');
       },
     },
     go: {
-      onEntry: () => {
-        lights.traffic = { red: false, amber: false, green: true };
-        lights.pedestrian = { red: true, green: false };
-      },
+      onEntry: () => {},
       on: {
         STOP: () => 'wait',
       },
@@ -103,28 +77,22 @@ const machine = machineFactory({
     },
     readyStop: {
       onEntry: ({ after }) => {
-        lights.traffic = { red: false, amber: true, green: false };
-        lights.pedestrian = { red: false, green: true };
-
         after(timeouts.readyStop, () => 'stop');
       },
     },
     afterReadyStop: {
       onEntry: ({ after }) => {
-        lights.traffic = { red: false, amber: true, green: false };
-        lights.pedestrian = { red: false, green: true };
-
         after(timeouts.readyStop, () => 'stop');
       },
     },
   },
   on: {
     STOP: () => {
-      if (lights.wait) {
+      if (waiting) {
         return null;
       }
 
-      lights.wait = true;
+      waiting = true;
 
       return 'wait';
     },
@@ -132,30 +100,45 @@ const machine = machineFactory({
 });
 
 machine.subscribe((state) => {
-  const { pedestrian, traffic, wait } = lights;
   const [time] = new Date().toTimeString().split(' ');
 
-  const trafficLights = [
-    traffic.red ? '🔴' : '⚫️',
-    traffic.amber ? '🟠' : '⚫️',
-    traffic.green ? '🟢' : '⚫️',
-  ]
-    .filter(Boolean)
-    .join('');
+  switch (state) {
+    case 'stop':
+      console.log(time);
+      console.log('Pedestrian:', '🟢');
+      console.log('Traffic:', '🔴');
+      break;
 
-  const pedestrianLights = [
-    pedestrian.red ? '🔴' : '⚫️',
-    pedestrian.green ? '🟢' : '⚫️',
-  ]
-    .filter(Boolean)
-    .join('');
+    case 'beforeReadyGo':
+      console.log(time);
+      console.log('Pedestrian:', '🔴');
+      console.log('Traffic:', '🔴');
+      break;
 
-  const waitLight = wait ? '🟠' : '⚫️';
+    case 'readyGo':
+      console.log(time);
+      console.log('Pedestrian:', '🔴');
+      console.log('Traffic:', '🔴 🟠');
+      break;
 
-  console.log(`[${time}] Transitioned to "${state}"`);
-  console.log(`    traffic: ${trafficLights}`);
-  console.log(`pedestrians: ${pedestrianLights}`);
-  console.log(`       wait: ${waitLight}`);
+    case 'go':
+      console.log(time);
+      console.log('Pedestrian:', '🔴');
+      console.log('Traffic:', '🟢');
+      break;
+
+    case 'readyStop':
+      console.log(time);
+      console.log('Pedestrian:', '🔴');
+      console.log('Traffic:', '🟠');
+      break;
+
+    case 'afterReadyStop':
+      console.log(time);
+      console.log('Pedestrian:', '🔴');
+      console.log('Traffic:', '🔴');
+      break;
+  }
 });
 
 // Add keyboard input handling

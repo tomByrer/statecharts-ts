@@ -32,7 +32,7 @@ const machine = machineFactory({
 });
 
 machine.subscribe((state) => {
-  console.log('Current state:', state);
+  console.log('State:', state);
 });
 
 process.stdin.setRawMode(true);

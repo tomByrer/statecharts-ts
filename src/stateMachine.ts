@@ -121,6 +121,29 @@ export class StateMachine<E extends MachineEvent, S extends string> {
       this.setActiveStateName(initialState);
     }
   }
+  private handleEvent(event: E): void {
+    const callback = this.config.on?.[event.type as E['type']];
+
+    if (callback) {
+      let activeStateName = callback({
+        event: event as Extract<E, { type: E['type'] }>,
+      });
+
+      if (activeStateName) {
+        let parentState = this.stateRegistry.get(activeStateName);
+
+        while (parentState && parentState.activeStateName !== activeStateName) {
+          parentState.getActiveState()?.exit();
+          parentState.setActiveStateName(activeStateName!);
+          parentState.getActiveState()?.enter();
+          activeStateName = parentState.stateName;
+          parentState = parentState.parentState;
+        }
+
+        this.onTransition?.();
+      }
+    }
+  }
 
   enter(): void {
     if (this.onEntry) {
@@ -131,29 +154,11 @@ export class StateMachine<E extends MachineEvent, S extends string> {
 
     if (this.config.on) {
       for (const eventType in this.config.on) {
-        const callback = this.config.on[eventType as E['type']];
+        const eventSubscription = this.eventBus.on(eventType, (event: E) => {
+          this.handleEvent(event);
+        });
 
-        if (callback) {
-          const handler = (event: E) => {
-            const newState = callback({
-              event: event as Extract<E, { type: typeof eventType }>,
-            });
-
-            if (newState) {
-              const parentState = this.stateRegistry.get(newState);
-
-              if (parentState) {
-                parentState.getActiveState()?.exit();
-                parentState.setActiveStateName(newState);
-                parentState.getActiveState()?.enter();
-              }
-            }
-          };
-
-          const eventSubscription = this.eventBus.on(eventType, handler);
-
-          this.eventUnsubscribers.push(eventSubscription);
-        }
+        this.eventUnsubscribers.push(eventSubscription);
       }
     }
 
@@ -162,8 +167,6 @@ export class StateMachine<E extends MachineEvent, S extends string> {
 
       state.enter();
     }
-
-    this.onTransition?.();
   }
 
   exit(): void {
@@ -225,9 +228,14 @@ export class StateMachine<E extends MachineEvent, S extends string> {
   getState(): MachineState<S> {
     if (this.states) {
       if (this.type === 'sequential') {
+        const childState = this.states[this.activeStateName as S];
+
+        if (childState.type === 'leaf') {
+          return this.activeStateName;
+        }
+
         return {
-          [this.activeStateName as S]:
-            this.states[this.activeStateName as S].getState(),
+          [this.activeStateName as S]: childState.getState(),
         } as MachineState<S>;
       }
 

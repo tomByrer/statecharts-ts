@@ -85,7 +85,7 @@ export class StateMachine<E extends MachineEvent, S extends string> {
     // If there are child states, create them
     if (this.config.states) {
       const stateKeys = Object.keys(this.config.states);
-      let initialState = stateKeys[0] as S;
+      let initialState;
 
       // Create all states
       for (const stateName of stateKeys) {
@@ -114,8 +114,13 @@ export class StateMachine<E extends MachineEvent, S extends string> {
           if (initialState) {
             throw new Error('Multiple initial states found');
           }
+
           initialState = stateName as S;
         }
+      }
+
+      if (!initialState) {
+        initialState = stateKeys[0] as S;
       }
 
       this.setActiveStateName(initialState);
@@ -214,6 +219,7 @@ export class StateMachine<E extends MachineEvent, S extends string> {
       }
 
       parentState.setActiveStateName(stateName);
+      parentState.getActiveState()?.enter();
     }, ms);
 
     this.timers.push(timer);

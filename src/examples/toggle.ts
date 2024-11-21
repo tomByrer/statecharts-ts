@@ -2,30 +2,64 @@ import { machineFactory } from '..';
 
 // Light switch machine
 const machine = machineFactory({
-  events: {} as { type: 'TOGGLE' },
+  events: {} as {
+    type: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
+  },
   states: {
     a: {
       states: {
         a1: {
           on: {
-            TOGGLE: () => 'a2',
+            A: () => 'a2',
+            B: () => 'b',
           },
         },
         a2: {
           on: {
-            TOGGLE: () => 'b',
+            B: () => 'b',
           },
         },
       },
     },
     b: {
+      type: 'parallel',
       on: {
-        TOGGLE: () => 'c',
+        B: () => 'c',
+      },
+      states: {
+        b1: {
+          states: {
+            b11: {
+              on: {
+                C: () => 'b12',
+              },
+            },
+            b12: {
+              on: {
+                D: () => 'b11',
+              },
+            },
+          },
+        },
+        b2: {
+          states: {
+            b21: {
+              on: {
+                E: () => 'b22',
+              },
+            },
+            b22: {
+              on: {
+                F: () => 'b21',
+              },
+            },
+          },
+        },
       },
     },
     c: {
       on: {
-        TOGGLE: () => 'a1',
+        G: () => 'a1',
       },
     },
   },
@@ -35,9 +69,18 @@ machine.subscribe((state) => {
   console.log('State:', state);
 });
 
-process.stdin.setRawMode(true);
-process.stdin.resume();
-process.stdin.setEncoding('utf8');
+machine.start();
+
+console.log('\nSending A');
+machine.send({ type: 'A' });
+
+console.log('\nSending B');
+machine.send({ type: 'B' });
+
+console.log('\nSending C');
+machine.send({ type: 'C' });
+
+console.log('\nPress ctrl+c to exit\n');
 
 process.stdin.on('data', (key: Buffer) => {
   // ctrl+c
@@ -45,10 +88,4 @@ process.stdin.on('data', (key: Buffer) => {
     machine.stop();
     process.exit(0);
   }
-
-  machine.send({ type: 'TOGGLE' });
 });
-
-console.log('Press any key to toggle the light, ctrl+c to exit\n');
-
-machine.start();

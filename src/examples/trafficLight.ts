@@ -94,51 +94,13 @@ const machine = machineFactory({
 
       waiting = true;
 
-      return 'wait';
+      return null;
     },
   },
 });
 
 machine.subscribe((state) => {
-  const [time] = new Date().toTimeString().split(' ');
-
-  switch (state) {
-    case 'stop':
-      console.log(time);
-      console.log('Pedestrian:', '🟢');
-      console.log('Traffic:', '🔴');
-      break;
-
-    case 'beforeReadyGo':
-      console.log(time);
-      console.log('Pedestrian:', '🔴');
-      console.log('Traffic:', '🔴');
-      break;
-
-    case 'readyGo':
-      console.log(time);
-      console.log('Pedestrian:', '🔴');
-      console.log('Traffic:', '🔴 🟠');
-      break;
-
-    case 'go':
-      console.log(time);
-      console.log('Pedestrian:', '🔴');
-      console.log('Traffic:', '🟢');
-      break;
-
-    case 'readyStop':
-      console.log(time);
-      console.log('Pedestrian:', '🔴');
-      console.log('Traffic:', '🟠');
-      break;
-
-    case 'afterReadyStop':
-      console.log(time);
-      console.log('Pedestrian:', '🔴');
-      console.log('Traffic:', '🔴');
-      break;
-  }
+  console.log(state);
 });
 
 // Add keyboard input handling
@@ -164,5 +126,3 @@ console.clear();
 console.log('Press SPACE to trigger stop, ctrl+C to exit\n');
 
 machine.start();
-
-console.log(machine.getState());

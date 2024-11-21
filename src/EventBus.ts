@@ -22,7 +22,15 @@ export class EventBus<E extends MachineEvent, T = string> {
       callback(event);
     }
 
-    for (const callback of this.subscriptions.get(event.type as T) ?? []) {
+    const subscriptions = this.subscriptions.get(event.type as T);
+
+    if (!subscriptions) {
+      console.warn(`No subscriptions for event type: ${event.type}`);
+
+      return;
+    }
+
+    for (const callback of subscriptions) {
       callback(event);
     }
   }

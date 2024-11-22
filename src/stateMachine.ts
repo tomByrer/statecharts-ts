@@ -9,6 +9,7 @@ import {
 } from './State';
 
 export type StateConfig<E extends MachineEvent, S extends string> = {
+  events?: E;
   parallel?: boolean;
   initial?: boolean;
   states?: Partial<{

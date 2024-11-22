@@ -5,10 +5,10 @@ export type MachineEvent = {
   data?: unknown;
 };
 
-type AfterCallback = () => void;
+type AfterCallback<S> = () => S;
 
-export type EntryHandler = (params: {
-  after: (ms: number, callback: AfterCallback) => void;
+export type EntryHandler<S> = (params: {
+  after: (ms: number, callback: AfterCallback<S>) => void;
 }) => void;
 
 export type ExitHandler = () => void;
@@ -31,7 +31,7 @@ export class State<E extends MachineEvent, S extends string> {
   private machineContext: MachineContext<E, S>;
 
   readonly id: S;
-  onEntry?: EntryHandler;
+  onEntry?: EntryHandler<S>;
   onExit?: ExitHandler;
   parallel = false;
   initial: boolean = false;
@@ -66,14 +66,16 @@ export class State<E extends MachineEvent, S extends string> {
   }
 
   notifyListeners(event: MachineEvent, trickleDown: boolean = true) {
-    const eventType = event.type as E['type'];
-    const listener = this.listeners[eventType];
+    if (this.active) {
+      const eventType = event.type as E['type'];
+      const listener = this.listeners[eventType];
 
-    if (listener) {
-      const targetId = listener(event as Extract<E, MachineEvent>);
+      if (listener) {
+        const targetId = listener(event as Extract<E, MachineEvent>);
 
-      if (targetId) {
-        this.transitionTo(targetId);
+        if (targetId) {
+          this.transitionTo(targetId);
+        }
       }
     }
 
@@ -89,6 +91,8 @@ export class State<E extends MachineEvent, S extends string> {
       this.exit();
       targetState.enter();
     }
+
+    this.machineContext.notifyListeners();
   }
 
   notifyChildren(event: MachineEvent) {
@@ -139,7 +143,6 @@ export class State<E extends MachineEvent, S extends string> {
 
   exit() {
     this.active = false;
-    this.listeners = {} as EventHandlers<E, S>;
 
     for (const timer of this.timers) {
       clearTimeout(timer);
@@ -156,9 +159,10 @@ export class State<E extends MachineEvent, S extends string> {
     }
   }
 
-  after(ms: number, callback: AfterCallback) {
+  after<S>(ms: number, callback: AfterCallback<S>) {
     const timer = setTimeout(() => {
-      callback();
+      const stateId = callback();
+      this.transitionTo(stateId);
     }, ms);
 
     this.timers.push(timer);
@@ -187,21 +191,6 @@ export class State<E extends MachineEvent, S extends string> {
     }
 
     return state;
-  }
-
-  serialise<X extends StateHierarchy>(): SerialisedState<X> {
-    const activeChildren = this.getActiveChildren();
-
-    return activeChildren.reduce((acc, state) => {
-      const childStates = state.getActiveChildren();
-      if (childStates.length === 1) {
-        acc[state.id] = childStates[0].id as X;
-      } else {
-        acc[state.id] = state.serialise() as X;
-      }
-
-      return acc;
-    }, {} as SerialisedState<X>);
   }
 }
 

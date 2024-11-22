@@ -100,7 +100,7 @@ const machine = machineFactory({
 } as const);
 
 machine.subscribe((state) => {
-  console.log(state);
+  console.log('State:', state);
 });
 
 // Add keyboard input handling

@@ -1,6 +1,5 @@
 import { machineFactory } from '..';
 
-// Light switch machine
 const machine = machineFactory({
   events: {} as {
     type: 'A' | 'B';
@@ -9,23 +8,14 @@ const machine = machineFactory({
     a: {
       states: {
         a1: {
-          onEntry: () => {
-            console.log('Entering a1');
-          },
-          onExit: () => {
-            console.log('Exiting a1');
+          onEntry: ({ after }) => {
+            after(1000, () => 'a2');
           },
           on: {
             A: () => 'a2',
           },
         },
         a2: {
-          onEntry: () => {
-            console.log('Entering a2');
-          },
-          onExit: () => {
-            console.log('Exiting a2');
-          },
           on: {
             A: () => 'a1',
             B: () => 'b',
@@ -34,11 +24,20 @@ const machine = machineFactory({
       },
     },
     b: {
-      onEntry: () => {
-        console.log('Entering b');
-      },
       on: {
-        A: () => 'a',
+        B: () => 'a',
+      },
+      states: {
+        b1: {
+          on: {
+            A: () => 'b2',
+          },
+        },
+        b2: {
+          on: {
+            A: () => 'b1',
+          },
+        },
       },
     },
   },

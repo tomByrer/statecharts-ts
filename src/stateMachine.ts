@@ -18,7 +18,7 @@ export type StateConfig<E extends MachineEvent, S extends string> = {
   on?: {
     [K in E['type']]?: EventHandler<Extract<E, { type: K }>, S>;
   };
-  onEntry?: EntryHandler;
+  onEntry?: EntryHandler<S>;
   onExit?: ExitHandler;
 };
 
@@ -31,6 +31,7 @@ export type StateRegistry<E extends MachineEvent, S extends string> = Map<
 
 export type MachineContext<E extends MachineEvent, S extends string> = {
   stateRegistry: StateRegistry<E, S>;
+  notifyListeners: () => void;
 };
 
 export class StateMachine<
@@ -55,6 +56,7 @@ export class StateMachine<
   buildState(config: StateConfig<E, S>, parent: State<E, S> | null, id: S) {
     const machineContext: MachineContext<E, S> = {
       stateRegistry: this.stateRegistry,
+      notifyListeners: () => this.notifyListeners(this.rootState),
     };
 
     const state = new State<E, S>(parent, id, machineContext);
@@ -65,6 +67,7 @@ export class StateMachine<
 
     for (const event in config.on) {
       const handler = config.on[event as E['type']]!;
+
       state.on(event, handler);
     }
 
@@ -98,8 +101,10 @@ export class StateMachine<
   }
 
   notifyListeners(state: State<E, S>) {
+    const serialisedState = this.serialise<X>(state);
+
     for (const handler of this.listeners) {
-      handler(state.serialise<X>());
+      handler(serialisedState);
     }
   }
 
@@ -126,5 +131,19 @@ export class StateMachine<
     }
 
     this.rootState.notifyListeners(event);
+  }
+
+  serialise<X extends StateHierarchy>(state: State<E, S>): SerialisedState<X> {
+    const activeChildren = state.getActiveChildren();
+
+    if (activeChildren.length === 1) {
+      return activeChildren[0].id as X;
+    }
+
+    return state.getActiveChildren().reduce((acc, state) => {
+      acc[state.id] = this.serialise(state) as X;
+
+      return acc;
+    }, {} as SerialisedState<X>);
   }
 }

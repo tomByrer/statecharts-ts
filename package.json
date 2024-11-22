@@ -1,5 +1,5 @@
 {
-  "name": "statechart-ts",
+  "name": "tiny-state-machine-ts",
   "version": "0.1.0",
   "description": "A class-less, type-safe state machine library for TypeScript.",
   "main": "dist/index.cjs.js",

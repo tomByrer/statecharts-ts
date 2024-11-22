@@ -1,9 +1,10 @@
+// State.ts
 import { type MachineContext } from './StateMachine';
 
-export type MachineEvent = {
+export interface MachineEvent<T = unknown> {
   type: string;
-  data?: unknown;
-};
+  data?: T;
+}
 
 type AfterCallback<S> = () => S;
 
@@ -15,19 +16,15 @@ export type ExitHandler = () => void;
 
 export type EventHandler<E, S> = (event: E) => S;
 
-type EventHandlers<E extends MachineEvent, S> = {
+type EventHandlers<E extends MachineEvent, S> = Partial<{
   [K in E['type']]: EventHandler<Extract<E, { type: K }>, S>;
-};
-
-export type StateHierarchy = {
-  [key: string]: StateHierarchy | string;
-};
+}>;
 
 export class State<E extends MachineEvent, S extends string> {
   private children: State<E, S>[] = [];
   private parentState: State<E, S> | null;
   private timers: ReturnType<typeof setTimeout>[] = [];
-  private listeners: EventHandlers<E, S> = {} as EventHandlers<E, S>;
+  private listeners: EventHandlers<E, S> = {};
   private machineContext: MachineContext<E, S>;
 
   readonly id: S;
@@ -65,20 +62,16 @@ export class State<E extends MachineEvent, S extends string> {
     this.listeners[eventType] = handler;
   }
 
-  notifyListeners(event: MachineEvent, trickleDown: boolean = true) {
+  notifyListeners(event: E, trickleDown: boolean = true) {
     if (this.active) {
-      const eventType = event.type as E['type'];
-      const listener = this.listeners[eventType];
-
+      const listener = this.listeners[event.type];
       if (listener) {
-        const targetId = listener(event as Extract<E, MachineEvent>);
-
+        const targetId = listener(event);
         if (targetId) {
           this.transitionTo(targetId);
         }
       }
     }
-
     if (trickleDown) {
       this.notifyChildren(event);
     }
@@ -87,21 +80,18 @@ export class State<E extends MachineEvent, S extends string> {
   transitionTo(targetId: S) {
     const targetState = this.getStateById(targetId);
 
-    if (targetState) {
-      this.exit();
-      targetState.enter();
-    }
-
+    this.exit();
+    targetState.enter();
     this.machineContext.notifyListeners();
   }
 
-  notifyChildren(event: MachineEvent) {
+  notifyChildren(event: E) {
     for (const child of this.getActiveChildren()) {
       child.notifyListeners(event);
     }
   }
 
-  on<T extends string>(
+  on<T extends E['type']>(
     eventType: T,
     handler: EventHandler<Extract<E, { type: T }>, S>,
   ) {
@@ -129,7 +119,7 @@ export class State<E extends MachineEvent, S extends string> {
     } else {
       const initialChildren = this.children.filter((child) => child.initial);
 
-      if (initialChildren.length > 0) {
+      if (initialChildren.length > 1) {
         console.warn(
           `Multiple initial states found for state ${this.id}. Using first match.`,
         );
@@ -159,12 +149,11 @@ export class State<E extends MachineEvent, S extends string> {
     }
   }
 
-  after<S>(ms: number, callback: AfterCallback<S>) {
+  after(ms: number, callback: AfterCallback<S>) {
     const timer = setTimeout(() => {
       const stateId = callback();
       this.transitionTo(stateId);
     }, ms);
-
     this.timers.push(timer);
   }
 
@@ -193,5 +182,3 @@ export class State<E extends MachineEvent, S extends string> {
     return state;
   }
 }
-
-export type SerialisedState<X extends StateHierarchy> = X;

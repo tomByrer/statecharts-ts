@@ -1,3 +1,4 @@
+// toggle.ts
 import { machineFactory } from '..';
 
 const machine = machineFactory({

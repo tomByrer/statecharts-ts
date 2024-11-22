@@ -19,6 +19,10 @@ type EventHandlers<E extends MachineEvent, S> = {
   [K in E['type']]: EventHandler<Extract<E, { type: K }>, S>;
 };
 
+export type StateHierarchy = {
+  [key: string]: StateHierarchy | string;
+};
+
 export class State<E extends MachineEvent, S extends string> {
   private children: State<E, S>[] = [];
   private parentState: State<E, S> | null;
@@ -173,14 +177,19 @@ export class State<E extends MachineEvent, S extends string> {
   }
 
   getStateById(id: S) {
-    return (
+    const state =
       this.getChildById(id) ??
       this.getSiblingById(id) ??
-      this.machineContext.stateRegistry.get(id)
-    );
+      this.machineContext.stateRegistry.get(id);
+
+    if (!state) {
+      throw new Error(`State with id ${id} not found`);
+    }
+
+    return state;
   }
 
-  serialise<X>(): SerialisedState<X> {
+  serialise<X extends StateHierarchy>(): SerialisedState<X> {
     const activeChildren = this.getActiveChildren();
 
     return activeChildren.reduce((acc, state) => {
@@ -196,8 +205,4 @@ export class State<E extends MachineEvent, S extends string> {
   }
 }
 
-export type SerialisedState<X> =
-  | {
-      [key: string]: X;
-    }
-  | X;
+export type SerialisedState<X extends StateHierarchy> = X;

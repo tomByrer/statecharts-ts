@@ -5,6 +5,7 @@ import {
   ExitHandler,
   EventHandler,
   SerialisedState,
+  StateHierarchy,
 } from './State';
 
 export type StateConfig<E extends MachineEvent, S extends string> = {
@@ -32,7 +33,11 @@ export type MachineContext<E extends MachineEvent, S extends string> = {
   stateRegistry: StateRegistry<E, S>;
 };
 
-export class StateMachine<E extends MachineEvent, S extends string, X> {
+export class StateMachine<
+  E extends MachineEvent,
+  S extends string,
+  X extends StateHierarchy,
+> {
   private listeners: StateChangeHandler<X>[];
   private stateRegistry: StateRegistry<E, S> = new Map();
 
@@ -94,7 +99,7 @@ export class StateMachine<E extends MachineEvent, S extends string, X> {
 
   notifyListeners(state: State<E, S>) {
     for (const handler of this.listeners) {
-      handler(state.serialise());
+      handler(state.serialise<X>());
     }
   }
 
@@ -111,8 +116,8 @@ export class StateMachine<E extends MachineEvent, S extends string, X> {
     this.rootState.exit();
   }
 
-  value() {
-    return this.rootState.serialise();
+  value(): SerialisedState<X> {
+    return this.rootState.serialise<X>();
   }
 
   send(event: E) {

@@ -45,7 +45,7 @@ const machine = machineFactory({
 } as const);
 
 machine.subscribe((state) => {
-  state.state.console.log('State:', state);
+  console.log('State:', state);
 });
 
 machine.start();

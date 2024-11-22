@@ -1,3 +1,5 @@
+import { type MachineContext } from './StateMachine';
+
 export type MachineEvent = {
   type: string;
   data?: unknown;
@@ -22,6 +24,7 @@ export class State<E extends MachineEvent, S extends string> {
   private parentState: State<E, S> | null;
   private timers: ReturnType<typeof setTimeout>[] = [];
   private listeners: EventHandlers<E, S> = {} as EventHandlers<E, S>;
+  private machineContext: MachineContext<E, S>;
 
   readonly id: S;
   onEntry?: EntryHandler;
@@ -30,13 +33,25 @@ export class State<E extends MachineEvent, S extends string> {
   initial: boolean = false;
   active: boolean = false;
 
-  constructor(parentState: State<E, S> | null, id: S) {
+  constructor(
+    parentState: State<E, S> | null,
+    id: S,
+    machineContext: MachineContext<E, S>,
+  ) {
     this.id = id;
     this.parentState = parentState;
+    this.machineContext = machineContext;
   }
 
   addChild(child: State<E, S>) {
     this.children.push(child);
+    try {
+      this.machineContext.stateRegistry.set(child.id, child);
+    } catch {
+      console.warn(
+        `State with id ${child.id} already exists. Ignoring duplicate state.`,
+      );
+    }
   }
 
   setListener<T extends E['type']>(
@@ -48,26 +63,33 @@ export class State<E extends MachineEvent, S extends string> {
 
   notifyListeners(event: MachineEvent, trickleDown: boolean = true) {
     const eventType = event.type as E['type'];
-
     const listener = this.listeners[eventType];
 
     if (listener) {
       const targetId = listener(event as Extract<E, MachineEvent>);
 
       if (targetId) {
-        const sibling = this.parentState?.getChildById(targetId);
-
-        if (sibling) {
-          this.exit();
-          sibling.enter();
-        }
+        this.transitionTo(targetId);
       }
     }
 
     if (trickleDown) {
-      for (const child of this.children) {
-        child.notifyListeners(event);
-      }
+      this.notifyChildren(event);
+    }
+  }
+
+  transitionTo(targetId: S) {
+    const targetState = this.getStateById(targetId);
+
+    if (targetState) {
+      this.exit();
+      targetState.enter();
+    }
+  }
+
+  notifyChildren(event: MachineEvent) {
+    for (const child of this.getActiveChildren()) {
+      child.notifyListeners(event);
     }
   }
 
@@ -113,6 +135,7 @@ export class State<E extends MachineEvent, S extends string> {
 
   exit() {
     this.active = false;
+    this.listeners = {} as EventHandlers<E, S>;
 
     for (const timer of this.timers) {
       clearTimeout(timer);
@@ -145,24 +168,36 @@ export class State<E extends MachineEvent, S extends string> {
     return this.children.find((child) => child.id === id);
   }
 
-  serialise(): SerialisedState {
-    if (!this.active) {
-      return null;
-    }
+  getSiblingById(id: S) {
+    return this.parentState?.getChildById(id);
+  }
 
+  getStateById(id: S) {
+    return (
+      this.getChildById(id) ??
+      this.getSiblingById(id) ??
+      this.machineContext.stateRegistry.get(id)
+    );
+  }
+
+  serialise<X>(): SerialisedState<X> {
     const activeChildren = this.getActiveChildren();
 
     return activeChildren.reduce((acc, state) => {
       const childStates = state.getActiveChildren();
       if (childStates.length === 1) {
-        acc[state.id] = childStates[0].id;
+        acc[state.id] = childStates[0].id as X;
       } else {
-        acc[state.id] = state.serialise();
+        acc[state.id] = state.serialise() as X;
       }
 
       return acc;
-    }, {} as SerialisedState);
+    }, {} as SerialisedState<X>);
   }
 }
 
-type SerialisedState = any;
+export type SerialisedState<X> =
+  | {
+      [key: string]: X;
+    }
+  | X;

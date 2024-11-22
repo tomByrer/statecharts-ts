@@ -27,80 +27,18 @@ const machine = machineFactory({
             console.log('Exiting a2');
           },
           on: {
-            A: () => 'b',
+            A: () => 'a1',
+            B: () => 'b',
           },
         },
       },
     },
     b: {
-      parallel: true,
       onEntry: () => {
         console.log('Entering b');
       },
-      onExit: () => {
-        console.log('Exiting b');
-      },
       on: {
-        B: () => 'c',
-      },
-      states: {
-        b1: {
-          states: {
-            b11: {
-              onEntry: () => {
-                console.log('Entering b11');
-              },
-              onExit: () => {
-                console.log('Exiting b11');
-              },
-              on: {
-                A: () => 'b12',
-              },
-            },
-            b12: {
-              on: {
-                A: () => 'b11',
-              },
-            },
-          },
-        },
-        b2: {
-          states: {
-            b21: {
-              onEntry: () => {
-                console.log('Entering b21');
-              },
-              onExit: () => {
-                console.log('Exiting b21');
-              },
-              on: {
-                A: () => 'b22',
-              },
-            },
-            b22: {
-              onEntry: () => {
-                console.log('Entering b22');
-              },
-              onExit: () => {
-                console.log('Exiting b22');
-              },
-              on: {
-                A: () => 'b21',
-              },
-            },
-          },
-        },
-      },
-    },
-    c: {
-      onEntry: () => {
-        console.log('Entering c');
-      },
-      onExit: () => {
-        console.log('Exiting c');
-      },
-      on: {
-        A: () => 'a1',
+        A: () => 'a',
       },
     },
   },
@@ -118,6 +56,7 @@ process.stdin.resume();
 process.stdin.setEncoding('utf8');
 
 process.stdin.on('data', (key: Buffer) => {
+  console.log();
   // ctrl+c
   if (key.toString() === '\u0003') {
     console.log('Exiting...');
@@ -125,9 +64,14 @@ process.stdin.on('data', (key: Buffer) => {
     process.exit(0);
   }
 
-  // space key
-  if (key.toString() === ' ') {
-    console.log('Sending A');
-    machine.send({ type: 'A' });
+  switch (key.toString()) {
+    case 'a':
+      console.log('Sending A');
+      machine.send({ type: 'A' });
+      break;
+    case 'b':
+      console.log('Sending B');
+      machine.send({ type: 'B' });
+      break;
   }
 });

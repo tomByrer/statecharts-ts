@@ -1,3 +1,5 @@
+import { MachineEvent } from './State';
+
 export class EventBus<E extends MachineEvent, T = string> {
   private subscriptions: Map<T | '*', Set<(event: E) => void>>;
 

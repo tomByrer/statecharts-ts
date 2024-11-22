@@ -4,44 +4,55 @@ import {
   EntryHandler,
   ExitHandler,
   EventHandler,
+  SerialisedState,
 } from './State';
 
-export type StateConfig<E extends MachineEvent> = {
+export type StateConfig<E extends MachineEvent, S extends string> = {
   events?: E;
   parallel?: boolean;
   initial?: boolean;
   states?: Partial<{
-    [K in string]: StateConfig<E>;
+    [K in string]: StateConfig<E, S>;
   }>;
   on?: {
-    [K in E['type']]?: EventHandler<Extract<E, { type: K }>>;
+    [K in E['type']]?: EventHandler<Extract<E, { type: K }>, S>;
   };
   onEntry?: EntryHandler;
   onExit?: ExitHandler;
 };
 
-type StateChangeHandler<E extends MachineEvent> = (state: State<E>) => void;
+type StateChangeHandler<X> = (state: SerialisedState<X>) => void;
 
-export class StateMachine<E extends MachineEvent> {
-  private listeners: StateChangeHandler<E>[];
+export type StateRegistry<E extends MachineEvent, S extends string> = Map<
+  S,
+  State<E, S>
+>;
 
-  rootState: State<E>;
+export type MachineContext<E extends MachineEvent, S extends string> = {
+  stateRegistry: StateRegistry<E, S>;
+};
+
+export class StateMachine<E extends MachineEvent, S extends string, X> {
+  private listeners: StateChangeHandler<X>[];
+  private stateRegistry: StateRegistry<E, S> = new Map();
+
+  rootState: State<E, S>;
 
   get isRunning() {
     return this.rootState.active;
   }
 
-  constructor(rootConfig: StateConfig<E>) {
+  constructor(rootConfig: StateConfig<E, S>) {
     this.listeners = [];
-    this.rootState = this.buildState(rootConfig, null, 'root');
+    this.rootState = this.buildState(rootConfig, null, 'root' as S);
   }
 
-  buildState(
-    config: StateConfig<E>,
-    parent: State<E> | null,
-    id: string = 'root',
-  ) {
-    const state = new State<E>(parent, id);
+  buildState(config: StateConfig<E, S>, parent: State<E, S> | null, id: S) {
+    const machineContext: MachineContext<E, S> = {
+      stateRegistry: this.stateRegistry,
+    };
+
+    const state = new State<E, S>(parent, id, machineContext);
 
     state.parallel = config.parallel ?? false;
     state.onEntry = config.onEntry;
@@ -56,7 +67,7 @@ export class StateMachine<E extends MachineEvent> {
       const stateEntries = Object.entries(config.states);
 
       for (const [childId, childConfig] of stateEntries) {
-        const childState = this.buildState(childConfig!, state, childId);
+        const childState = this.buildState(childConfig!, state, childId as S);
 
         if (childState.initial) {
           childState.initial = true;
@@ -69,15 +80,19 @@ export class StateMachine<E extends MachineEvent> {
     return state;
   }
 
-  subscribe(handler: StateChangeHandler<E>) {
+  getStateById(id: S) {
+    return this.stateRegistry.get(id);
+  }
+
+  subscribe(handler: StateChangeHandler<X>) {
     this.listeners.push(handler);
   }
 
-  unsubscribe(handler: StateChangeHandler<E>) {
+  unsubscribe(handler: StateChangeHandler<X>) {
     this.listeners = this.listeners.filter((h) => h !== handler);
   }
 
-  notifyListeners(state: State<E>) {
+  notifyListeners(state: State<E, S>) {
     for (const handler of this.listeners) {
       handler(state.serialise());
     }

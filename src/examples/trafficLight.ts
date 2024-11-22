@@ -97,7 +97,7 @@ const machine = machineFactory({
       return null;
     },
   },
-});
+} as const);
 
 machine.subscribe((state) => {
   console.log(state);

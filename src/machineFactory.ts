@@ -1,12 +1,6 @@
-import { StateMachineRoot, RootStateDefinition } from './StateMachineRoot';
+import { MachineEvent } from './State';
+import { StateConfig, StateMachine } from './StateMachine';
 
-export function machineFactory<E extends MachineEvent, S extends string>(
-  config: RootStateDefinition<E, S>,
-) {
-  return new StateMachineRoot(config);
+export function machineFactory<E extends MachineEvent>(config: StateConfig<E>) {
+  return new StateMachine(config);
 }
-
-export type Machine<
-  E extends MachineEvent,
-  S extends string,
-> = StateMachineRoot<E, S>;

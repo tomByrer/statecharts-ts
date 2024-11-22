@@ -3,26 +3,43 @@ import { machineFactory } from '..';
 // Light switch machine
 const machine = machineFactory({
   events: {} as {
-    type: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
+    type: 'A' | 'B';
   },
   states: {
     a: {
       states: {
         a1: {
+          onEntry: () => {
+            console.log('Entering a1');
+          },
+          onExit: () => {
+            console.log('Exiting a1');
+          },
           on: {
             A: () => 'a2',
-            B: () => 'b',
           },
         },
         a2: {
+          onEntry: () => {
+            console.log('Entering a2');
+          },
+          onExit: () => {
+            console.log('Exiting a2');
+          },
           on: {
-            B: () => 'b',
+            A: () => 'b',
           },
         },
       },
     },
     b: {
-      type: 'parallel',
+      parallel: true,
+      onEntry: () => {
+        console.log('Entering b');
+      },
+      onExit: () => {
+        console.log('Exiting b');
+      },
       on: {
         B: () => 'c',
       },
@@ -30,13 +47,19 @@ const machine = machineFactory({
         b1: {
           states: {
             b11: {
+              onEntry: () => {
+                console.log('Entering b11');
+              },
+              onExit: () => {
+                console.log('Exiting b11');
+              },
               on: {
-                C: () => 'b12',
+                A: () => 'b12',
               },
             },
             b12: {
               on: {
-                D: () => 'b11',
+                A: () => 'b11',
               },
             },
           },
@@ -44,13 +67,25 @@ const machine = machineFactory({
         b2: {
           states: {
             b21: {
+              onEntry: () => {
+                console.log('Entering b21');
+              },
+              onExit: () => {
+                console.log('Exiting b21');
+              },
               on: {
-                E: () => 'b22',
+                A: () => 'b22',
               },
             },
             b22: {
+              onEntry: () => {
+                console.log('Entering b22');
+              },
+              onExit: () => {
+                console.log('Exiting b22');
+              },
               on: {
-                F: () => 'b21',
+                A: () => 'b21',
               },
             },
           },
@@ -58,12 +93,18 @@ const machine = machineFactory({
       },
     },
     c: {
+      onEntry: () => {
+        console.log('Entering c');
+      },
+      onExit: () => {
+        console.log('Exiting c');
+      },
       on: {
-        G: () => 'a1',
+        A: () => 'a1',
       },
     },
   },
-});
+} as const);
 
 machine.subscribe((state) => {
   console.log('State:', state);
@@ -71,21 +112,22 @@ machine.subscribe((state) => {
 
 machine.start();
 
-console.log('\nSending A');
-machine.send({ type: 'A' });
-
-console.log('\nSending B');
-machine.send({ type: 'B' });
-
-console.log('\nSending C');
-machine.send({ type: 'C' });
-
-console.log('\nPress ctrl+c to exit\n');
+// Add keyboard input handling
+process.stdin.setRawMode(true);
+process.stdin.resume();
+process.stdin.setEncoding('utf8');
 
 process.stdin.on('data', (key: Buffer) => {
   // ctrl+c
   if (key.toString() === '\u0003') {
+    console.log('Exiting...');
     machine.stop();
     process.exit(0);
+  }
+
+  // space key
+  if (key.toString() === ' ') {
+    console.log('Sending A');
+    machine.send({ type: 'A' });
   }
 });

@@ -69,7 +69,7 @@
       "id": "exampleFile",
       "type": "pickString",
       "description": "Which example would you like to debug?",
-      "options": ["basic", "complex", "djDeck", "toggle", "trafficLight"]
+      "options": [ "toggle", "complex", "djDeck", "trafficLight"]
     }
   ]
 }

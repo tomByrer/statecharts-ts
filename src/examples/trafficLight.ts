@@ -59,7 +59,7 @@ const machine = machineFactory({
       },
     },
     readyGo: {
-      type: 'initial',
+      initial: true,
       onEntry: ({ after }) => {
         after(timeouts.readyGo, () => 'go');
       },

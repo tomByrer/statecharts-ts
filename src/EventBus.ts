@@ -15,6 +15,13 @@ export class EventBus<E extends MachineEvent, T = string> {
     this.subscriptions.set('*', new Set());
   }
 
+  /**
+   * Subscribes a callback to handle events of a specific type.
+   *
+   * @param eventType - The type of event to subscribe to
+   * @param callback - The callback function to execute when events occur
+   * @returns A function to unsubscribe the callback
+   */
   on(eventType: T, callback: (event: E) => void) {
     const currentSet = this.subscriptions.get(eventType) || new Set();
     this.subscriptions.set(eventType, new Set([...currentSet, callback]));
@@ -22,6 +29,12 @@ export class EventBus<E extends MachineEvent, T = string> {
     return () => this.off(eventType, callback);
   }
 
+  /**
+   * Unsubscribes a callback from handling events of a specific type.
+   *
+   * @param eventType - The type of event to unsubscribe from
+   * @param callback - The callback function to remove
+   */
   off(eventType: T, callback: (event: E) => void) {
     this.subscriptions.get(eventType)?.delete(callback);
   }

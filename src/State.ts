@@ -392,6 +392,7 @@ export class State<E extends MachineEvent, S extends string, C = unknown> {
    *
    * @param id - The ID of the state to find.
    * @returns {State<E, S>} - The state with the specified ID, or throws an error if not found.
+   * @throws {Error} When the state is not found
    */
   getStateById(id: S) {
     // Attempt to find the state by its ID through children, siblings, and the state registry

@@ -71,8 +71,18 @@ export class EventBus<E extends MachineEvent, T = string> {
     }
   }
 
-  clear() {
+  /**
+   * Removes all subscriptions and cleans up resources.
+   */
+  cleanup() {
     this.subscriptions.clear();
     this.subscriptions.set('*', new Set());
+  }
+
+  /**
+   * Enhanced clear method that uses cleanup
+   */
+  clear() {
+    this.cleanup();
   }
 }

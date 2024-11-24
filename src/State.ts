@@ -65,6 +65,13 @@ export type EventHandler<E, S, C> = (params: {
   setContext: (context: C) => void;
 }) => S | void;
 
+export class StateRegistryError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'StateRegistryError';
+  }
+}
+
 export class State<E extends MachineEvent, S extends string, C = unknown> {
   /**
    * Collection of child states.
@@ -102,20 +109,20 @@ export class State<E extends MachineEvent, S extends string, C = unknown> {
    * Adds a child state to the current state.
    *
    * @param child - The child state to add.
+   * @throws {StateRegistryError} When attempting to register a duplicate state ID
    */
   addChild(child: State<E, S, C>) {
-    // Add the child state to the children array.
     this.children.push(child);
 
-    // Attempt to register the child state in the state registry.
-    try {
-      this.machineContext.stateRegistry.set(child.id, child);
-    } catch {
-      // If the state already exists, log a warning and ignore the duplicate state.
-      console.warn(
-        `State with id ${child.id} already exists. Ignoring duplicate state.`,
+    if (this.machineContext.stateRegistry.has(child.id)) {
+      this.children.pop(); // Remove the child we just added
+
+      throw new StateRegistryError(
+        `Cannot register state: ID "${child.id}" is already registered in the state machine.`,
       );
     }
+
+    this.machineContext.stateRegistry.set(child.id, child);
   }
 
   /**

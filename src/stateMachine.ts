@@ -107,6 +107,13 @@ export type RootConfig<
   context: C;
 };
 
+export class StateMachineError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'StateMachineError';
+  }
+}
+
 export class StateMachine<
   E extends MachineEvent,
   S extends string,
@@ -274,13 +281,22 @@ export class StateMachine<
    * Sends an event to the state machine.
    *
    * @param event - The event to send.
+   * @throws {StateMachineError} When the state machine is not running or event handling fails
    */
   send(event: E) {
     if (!this.isRunning) {
-      throw new Error('State machine is not running');
+      throw new StateMachineError(
+        'Cannot send events when state machine is not running',
+      );
     }
 
-    this.rootState.notifyHandlers({ event });
+    try {
+      this.rootState.notifyHandlers({ event });
+    } catch (error) {
+      throw new StateMachineError(
+        `Failed to handle event "${event.type}": ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+    }
   }
 
   /**

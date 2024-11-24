@@ -130,7 +130,7 @@ export class StateMachine<
    *
    * @returns True if the state machine is running.
    */
-  get isRunning() {
+  isRunning() {
     return this.rootState.active;
   }
 
@@ -273,8 +273,17 @@ export class StateMachine<
    * Returns the current state of the state machine as a serialised state object.
    *
    */
-  value(): SerialisedState<S> {
+  getState(): SerialisedState<S> {
     return this.serialise(this.rootState);
+  }
+
+  /**
+   * Returns the context of the state machine.
+   *
+   * @returns The context of the state machine.
+   */
+  getContext(): C {
+    return this.context;
   }
 
   /**

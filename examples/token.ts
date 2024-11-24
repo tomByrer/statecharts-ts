@@ -1,5 +1,6 @@
-import { machineFactory } from '..';
-import { invariant } from '../lib';
+// examples/token.ts
+import { machineFactory } from '../src';
+import { invariant } from '../src/lib';
 
 function generateFakeGUID() {
   const hexDigits = '0123456789abcdef';

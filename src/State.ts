@@ -296,12 +296,14 @@ export class State<E extends MachineEvent, S extends string, C = unknown> {
    */
   async exit(params: { preserveHistory?: 'shallow' | 'deep'; event: E }) {
     const { preserveHistory, event } = params;
-    // Deactivate the state if history is not preserved
+
+    // Perform cleanup unless we're preserving history
     if (!preserveHistory) {
+      this.cleanup();
       this.active = false;
     }
 
-    // Clear all timers
+    // Clear all timers regardless of history
     this.timers.forEach(clearTimeout);
     this.timers = [];
 
@@ -405,5 +407,21 @@ export class State<E extends MachineEvent, S extends string, C = unknown> {
 
     // Return the found state
     return state;
+  }
+
+  /**
+   * Cleans up all resources associated with this state and its children.
+   * This includes timers and any registered handlers.
+   */
+  cleanup() {
+    // Clear all timers
+    this.timers.forEach(clearTimeout);
+    this.timers = [];
+
+    // Clear all handlers
+    this.handlers = {};
+
+    // Recursively cleanup children
+    this.children.forEach((child) => child.cleanup());
   }
 }

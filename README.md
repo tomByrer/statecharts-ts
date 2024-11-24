@@ -142,45 +142,6 @@ Check out our [examples](./examples) directory for more complex use cases, inclu
 
 For detailed API documentation, visit our [API docs](./docs/api.md).
 
-## Contributing
-
-Contributions are welcome! Please read our [contributing guidelines](CONTRIBUTING.md) first.
-
-## Testing
-
-statecharts-ts is designed with testability in mind. Here's how to test your state machines:
-
-```typescript
-import { machineFactory } from 'statecharts-ts';
-
-describe('toggleMachine', () => {
-  it('should toggle between states', () => {
-    const machine = machineFactory({
-      events: {} as { type: 'TOGGLE' },
-      states: {
-        off: {
-          initial: true,
-          on: {
-            TOGGLE: () => 'on',
-          },
-        },
-        on: {
-          on: {
-            TOGGLE: () => 'off',
-          },
-        },
-      },
-    });
-
-    machine.start();
-    expect(machine.value()).toBe('off');
-
-    machine.send({ type: 'TOGGLE' });
-    expect(machine.value()).toBe('on');
-  });
-});
-```
-
 ## TypeScript Integration
 
 statecharts-ts provides full TypeScript support with strict type checking:

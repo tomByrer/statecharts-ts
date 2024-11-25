@@ -36,8 +36,8 @@ export type StateConfig<
   parallel?: boolean;
 
   /**
-   * Designates the entry point for the state machine.
-   * Defaults to the first child state if not specified.
+   * Designates the initial child state ID.
+   * If not specified, defaults to the first child state.
    */
   initial?: boolean;
 
@@ -237,7 +237,7 @@ export class StateMachine<
    * @param state - The state to notify handlers of.
    */
   notifyHandlers(state: State<E, S, C>) {
-    const serialisedState = this.serialise(state);
+    const serialisedState = this.serialiseState(state);
 
     for (const handler of this.handlers) {
       handler(serialisedState);
@@ -250,7 +250,7 @@ export class StateMachine<
    * @param serialisedState - The serialised state to start the state machine in.
    */
   public start(serialisedState?: SerialisedState) {
-    if (this.isRunning) {
+    if (this.isRunning()) {
       return;
     }
 
@@ -274,7 +274,7 @@ export class StateMachine<
    *
    */
   getState(): SerialisedState<S> {
-    return this.serialise(this.rootState);
+    return this.serialiseState(this.rootState);
   }
 
   /**
@@ -283,7 +283,7 @@ export class StateMachine<
    * @returns The context of the state machine.
    */
   getContext(): C {
-    return this.context;
+    return structuredClone(this.context);
   }
 
   /**
@@ -314,7 +314,7 @@ export class StateMachine<
    * @param state - The state to serialise.
    * @returns The serialised state.
    */
-  serialise(state: State<E, S, C>): SerialisedState<S> {
+  serialiseState(state = this.rootState): SerialisedState<S> {
     const activeChildren = state.getActiveChildren();
 
     if (activeChildren.length === 1) {
@@ -323,10 +323,26 @@ export class StateMachine<
 
     return state.getActiveChildren().reduce(
       (acc, state) => {
-        acc[state.id as string] = this.serialise(state);
+        acc[state.id as string] = this.serialiseState(state);
         return acc;
       },
       {} as Record<string, SerialisedState<S>>,
     );
+  }
+
+  /**
+   * Serialises the state of the state machine into a serialised state object.
+   *
+   * @param state - The state to serialise.
+   * @returns The serialised state.
+   */
+  serialise() {
+    const state = this.serialiseState();
+    const context = this.getContext();
+
+    return {
+      state,
+      context,
+    };
   }
 }

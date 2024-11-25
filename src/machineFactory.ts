@@ -15,9 +15,25 @@ export function machineFactory<
   C,
   S extends string = string,
 >(config: RootConfig<E, S, C>) {
-  const { getContext, getState, send, start, stop } = new StateMachine<E, S, C>(
-    config,
-  );
+  const {
+    getContext,
+    getState,
+    send,
+    start,
+    stop,
+    subscribe,
+    unsubscribe,
+    serialise,
+  } = new StateMachine<E, S, C>(config);
 
-  return { getContext, getState, send, start, stop };
+  return {
+    getContext,
+    getState,
+    send,
+    start,
+    stop,
+    subscribe,
+    unsubscribe,
+    serialise,
+  };
 }

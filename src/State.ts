@@ -91,8 +91,8 @@ export class State<E extends MachineEvent, S extends string, C = unknown> {
   onEntry?: EntryHandler<S, C, E>;
   onExit?: ExitHandler<C, E>;
   parallel = false;
-  initial: boolean = false;
-  active: boolean = false;
+  initial = false;
+  active = false;
   history?: 'shallow' | 'deep';
 
   constructor(

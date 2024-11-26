@@ -70,7 +70,7 @@ const machine = machineFactory<Events, Context>({
     unauthenticated: {
       states: {
         idle: {
-          initial: true,
+          initial: 'idle',
           on: {
             AUTHENTICATE: () => 'fetchingToken',
           },
@@ -117,9 +117,9 @@ const machine = machineFactory<Events, Context>({
       },
     },
     authenticated: {
+      initial: 'waitForExpiration',
       states: {
         waitForExpiration: {
-          initial: true,
           onEntry: ({ after, context }) => {
             invariant(context.token, 'Invalid context');
 

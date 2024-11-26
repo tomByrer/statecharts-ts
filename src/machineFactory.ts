@@ -1,6 +1,6 @@
 import { StateMachine } from './StateMachine';
 
-import { MachineEvent } from './State';
+import { MachineEvent } from './StateNode';
 import { RootConfig } from './StateMachine';
 
 /**
@@ -10,11 +10,9 @@ import { RootConfig } from './StateMachine';
  * @param config - The configuration object for the state machine.
  * @returns A new state machine.
  */
-export function machineFactory<
-  E extends MachineEvent,
-  C,
-  S extends string = string,
->(config: RootConfig<E, S, C>) {
+export function machineFactory<E extends MachineEvent, C>(
+  config: RootConfig<E, C>,
+) {
   const {
     getContext,
     getState,
@@ -24,7 +22,7 @@ export function machineFactory<
     subscribe,
     unsubscribe,
     serialise,
-  } = new StateMachine<E, S, C>(config);
+  } = new StateMachine<E, C>(config);
 
   return {
     getContext,

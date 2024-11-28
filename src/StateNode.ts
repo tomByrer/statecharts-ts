@@ -77,7 +77,7 @@ export class StateNode<E extends MachineEvent, C = unknown> {
    * Collection of child states.
    */
   private children: StateNode<E, C>[] = [];
-  private parentState: StateNode<E, C> | null;
+  private parentStateNode: StateNode<E, C> | null;
   /**
    * Active timers managed by this state.
    */
@@ -135,14 +135,16 @@ export class StateNode<E extends MachineEvent, C = unknown> {
    */
   initial?: string;
 
-  constructor(
-    parentState: StateNode<E, C> | null,
-    id: string,
-    machineContext: MachineContext<E, C>,
-  ) {
-    this.id = id;
-    this.parentState = parentState;
-    this.machineContext = machineContext;
+  constructor(params: {
+    events?: E;
+    id: string;
+    parentStateNode: StateNode<E, C> | null;
+    machineContext: MachineContext<E, C>;
+    children?: StateNode<E, C>;
+  }) {
+    this.id = params.id;
+    this.parentStateNode = params.parentStateNode;
+    this.machineContext = params.machineContext;
   }
 
   /**
@@ -420,7 +422,7 @@ export class StateNode<E extends MachineEvent, C = unknown> {
    */
   getSiblingById(id: string) {
     // Attempt to find the sibling state by its ID through the parent state
-    return this.parentState?.getChildById(id);
+    return this.parentStateNode?.getChildById(id);
   }
 
   /**

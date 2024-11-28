@@ -87,25 +87,25 @@ export type SerialisedState<S = string> =
   | S
   | { [K in string]: SerialisedState<S> };
 
-// type CoerceNodeConfig<T extends NodeConfig<MachineEvent, unknown>> = {
-//   initial: keyof T['states'];
-//   states: {
-//     [K in keyof T['states']]: T['states'][K] extends NodeConfig<
-//       MachineEvent,
-//       unknown
-//     >
-//       ? CoerceNodeConfig<T['states'][K]>
-//       : T['states'][K];
-//   };
-// };
+type CoerceNodeConfig<T extends NodeConfig<MachineEvent, unknown>> = {
+  initial: keyof T['states'];
+  states: {
+    [K in keyof T['states']]: T['states'][K] extends NodeConfig<
+      MachineEvent,
+      unknown
+    >
+      ? CoerceNodeConfig<T['states'][K]>
+      : T['states'][K];
+  };
+};
 
-// type ValidateNodeConfig<T extends NodeConfig<MachineEvent, unknown>> =
-//   T extends never ? T : CoerceNodeConfig<T>;
+type ValidateNodeConfig<T extends NodeConfig<MachineEvent, unknown> | object> =
+  T extends never ? T : CoerceNodeConfig<T>;
 
 export type RootConfig<E extends MachineEvent, C = unknown> = {
   context: C;
   events: E;
-} & NodeConfig<E, C>;
+} & ValidateNodeConfig<NodeConfig<E, C>>;
 
 export class StateMachineError extends Error {
   constructor(message: string) {
@@ -154,13 +154,13 @@ export class StateMachine<E extends MachineEvent, C = unknown> {
    * Builds a state from a configuration object.
    *
    * @param config - The configuration object for the state.
-   * @param parent - The parent state of the new state.
+   * @param parentStateNode - The parent state of the new state.
    * @param id - The id of the new state.
    * @returns The new state.
    */
   buildState(
     config: NodeConfig<E, C>,
-    parent: StateNode<E, C> | null,
+    parentStateNode: StateNode<E, C> | null,
     id: string,
   ) {
     const machineContext: MachineContext<E, C> = {
@@ -170,7 +170,11 @@ export class StateMachine<E extends MachineEvent, C = unknown> {
       setContext: this.setContext.bind(this),
     };
 
-    const state = new StateNode<E, C>(parent, id, machineContext);
+    const state = new StateNode<E, C>({
+      parentStateNode,
+      id,
+      machineContext,
+    });
 
     state.parallel = config.parallel ?? false;
     state.onEntry = config.onEntry;

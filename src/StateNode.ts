@@ -1,7 +1,6 @@
 // State.ts
 
 import { invariant } from './lib';
-import mitt, { Emitter } from 'mitt';
 
 /**
  * Represents an event that can be handled by the state machine.
@@ -80,9 +79,9 @@ export class StateNode<E extends MachineEvent, C = unknown> {
   private children: StateNode<E, C>[] = [];
   private parentStateNode: StateNode<E, C> | undefined;
   private timers: ReturnType<typeof setTimeout>[] = [];
-  private emitter: Emitter<{
-    [K in E['type']]: Extract<E, { type: K }>;
-  }> = mitt();
+  private handlers: Partial<{
+    [K in E['type']]: EventHandler<Extract<E, { type: K }>, C>;
+  }> = {};
 
   readonly id: string;
 
@@ -151,45 +150,25 @@ export class StateNode<E extends MachineEvent, C = unknown> {
     eventType: T,
     handler: EventHandler<Extract<E, { type: T }>, C>,
   ) {
-    // Store handler reference for cleanup
-    const boundHandler = (event: Extract<E, { type: T }>) => {
-      if (!this.active) return;
+    this.handlers[eventType] = handler;
+  }
 
-      try {
+  dispatchEvent(event: E) {
+    if (this.active) {
+      const handler = this.handlers[event.type as E['type']];
+
+      if (handler) {
         const targetId = handler({
-          event,
+          event: event as Extract<E, { type: E['type'] }>,
           context: this.getContext(),
           setContext: this.setContext.bind(this),
           updateContext: this.updateContext.bind(this),
         });
 
         if (targetId) {
-          // Validate targetId exists before transition
-          const targetState = this.getStateById(targetId);
-          if (!targetState) {
-            throw new StateRegistryError(
-              `Invalid transition: State '${targetId}' does not exist`,
-            );
-          }
-          this.transitionTo(targetId, event as E);
+          this.transitionTo(targetId, event);
         }
-      } catch (error) {
-        // Preserve error chain while adding context
-        throw error instanceof Error
-          ? new StateRegistryError(
-              `Error handling event '${eventType}' in state '${this.id}': ${error.message}`,
-            )
-          : error;
       }
-    };
-
-    // Register the handler
-    this.emitter.on(eventType, boundHandler);
-  }
-
-  dispatchEvent(event: E) {
-    if (this.active) {
-      this.emitter.emit(event.type, event);
 
       for (const child of this.children) {
         child.dispatchEvent(event);
@@ -387,12 +366,12 @@ export class StateNode<E extends MachineEvent, C = unknown> {
   }
 
   cleanup() {
-    // Clear all event listeners
-    this.emitter.all.clear();
-
     // Clear all timers
     this.timers.forEach(clearTimeout);
     this.timers = [];
+
+    // Clear all handlers
+    this.handlers = {};
 
     // Recursively cleanup children
     this.children.forEach((child) => child.cleanup());

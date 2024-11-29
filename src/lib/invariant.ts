@@ -1,5 +1,3 @@
-type Condition = boolean | number | undefined | null | object | string | symbol;
-
 /**
  * Throws an error with the provided message if the condition is falsy.
  * Acts as a type guard to inform TypeScript of guaranteed conditions after the check.
@@ -16,10 +14,10 @@ class InvariantError extends Error {
 }
 
 function invariant(
-  condition: Condition,
+  condition: unknown,
   message: string | (() => string),
 ): asserts condition {
-  if (!condition) {
+  if (condition === false || condition === null || condition === undefined) {
     const errorMessage = typeof message === 'function' ? message() : message;
     throw new InvariantError(errorMessage);
   }

@@ -1,5 +1,7 @@
 // State.ts
 
+import { invariant } from './lib';
+
 /**
  * Represents an event that can be handled by the state machine.
  *
@@ -75,7 +77,7 @@ export class StateRegistryError extends Error {
 export class StateNode<E extends MachineEvent, C = unknown> {
   private context: C;
   private children: StateNode<E, C>[] = [];
-  private parentStateNode: StateNode<E, C> | null = null;
+  private parentStateNode: StateNode<E, C> | undefined;
   private timers: ReturnType<typeof setTimeout>[] = [];
   private handlers: Partial<{
     [K in E['type']]: EventHandler<Extract<E, { type: K }>, C>;
@@ -162,8 +164,46 @@ export class StateNode<E extends MachineEvent, C = unknown> {
   }
 
   transitionTo(targetId: string, event: E) {
-    // Retrieve the target state by its identifier
-    const targetState = this.getStateById(targetId);
+    invariant(this.parentStateNode, 'Parent state node not found');
+
+    // Start search from parent state node
+    let targetState = this.getStateById(targetId, this);
+    let searchState: StateNode<E, C> | undefined = this.parentStateNode;
+
+    if (!targetState) {
+      while (searchState) {
+        const found = searchState.getStateById(targetId);
+
+        if (found) {
+          targetState = found;
+
+          break;
+        }
+
+        searchState = searchState.parentStateNode;
+      }
+    }
+
+    invariant(targetState, `State with ID ${targetId} not found`);
+
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    let currentState: StateNode<E, C> = this;
+
+    while (currentState !== searchState) {
+      currentState = currentState.parentStateNode!;
+      currentState.exit(event);
+    }
+
+    const nodes: StateNode<E, C>[] = [];
+
+    while (currentState !== searchState) {
+      nodes.push(currentState);
+      currentState = currentState.parentStateNode!;
+    }
+
+    nodes.reverse().forEach((node) => {
+      node.enter(event);
+    });
 
     // Exit the current state
     this.exit(event);
@@ -274,50 +314,54 @@ export class StateNode<E extends MachineEvent, C = unknown> {
     return this.children.filter((child) => child.active);
   }
 
-  getChildStateById(id: string) {
-    return this.children.find((child) => child.id === id);
-  }
-
-  getSiblingStateById(id: string) {
-    if (!this.parentStateNode) {
+  /*
+   * Searches for and returns a StateNode with the given ID in the state tree
+   * Performs a breadth-first search starting from the current node
+   * Can exclude a specific node ID from the search
+   * Returns undefined if no matching node is found
+   *
+   * @param id - The ID of the state to search for
+   * @param current - The current state node to start the search from
+   * @param excludeId - The ID of the state to exclude from the search
+   * @returns The state node with the given ID, or undefined if not found
+   */
+  getStateById(
+    id: string,
+    current: StateNode<E, C> = this,
+    excludeId?: string,
+  ) {
+    // Return early if we've found the excluded ID
+    if (current.id === excludeId) {
       return undefined;
     }
 
-    // Attempt to find the sibling state by its ID through the parent state
-    return this.parentStateNode.getChildStateById(id);
-  }
-
-  getRootState(): StateNode<E, C> {
-    return this.parentStateNode?.getRootState() ?? this;
-  }
-
-  findDescendantStateById(
-    id: string,
-    currentStateNode: StateNode<E, C> = this.getRootState(),
-  ): StateNode<E, C> | undefined {
-    // If the current state node is the target state, return it
-    if (currentStateNode.id === id) {
-      return currentStateNode;
+    // Check if current node matches target ID
+    if (current.id === id) {
+      return current;
     }
 
-    // Recursively search through the children of the current state node
-    return currentStateNode.children.find((child) => {
-      return child.findDescendantStateById(id);
-    });
-  }
+    // Initialize queue with current node's children
+    const queue: StateNode<E, C>[] = [...current.children];
 
-  getStateById(id: string) {
-    // Attempt to find the state by its ID through children, siblings, and descendants
-    const state =
-      this.getChildStateById(id) ??
-      this.getSiblingStateById(id) ??
-      this.findDescendantStateById(id);
+    // Perform breadth-first search
+    while (queue.length > 0) {
+      const node = queue.shift()!;
 
-    if (!state) {
-      throw new Error(`State with id ${id} not found`);
+      // Skip excluded nodes
+      if (node.id === excludeId) {
+        continue;
+      }
+
+      // Return if we found the target ID
+      if (node.id === id) {
+        return node;
+      }
+
+      // Add children to queue to continue search
+      queue.push(...node.children);
     }
 
-    return state;
+    return undefined;
   }
 
   cleanup() {
@@ -333,23 +377,21 @@ export class StateNode<E extends MachineEvent, C = unknown> {
   }
 
   setContext(context: C) {
-    if (this.context) {
+    if (this.context !== undefined) {
       this.context = context;
+    } else if (this.parentStateNode) {
+      this.parentStateNode.setContext(context);
     } else {
-      try {
-        this.parentStateNode!.setContext(context);
-      } catch {
-        throw new Error('Context not found in current or parent state nodes');
-      }
+      throw new Error('Context not found in current or parent state nodes');
     }
   }
 
   getContext(): C {
-    try {
-      return this.context ?? this.parentStateNode!.getContext()!;
-    } catch {
-      throw new Error('Context not found in current or parent state nodes');
-    }
+    const context = this.context ?? this.parentStateNode?.getContext();
+
+    invariant(context, 'Context not found in current or parent state nodes');
+
+    return context;
   }
 
   updateContext(callback: (context: C) => C) {

@@ -1,6 +1,7 @@
 // State.ts
 
 import { invariant } from './lib';
+import mitt, { Emitter } from 'mitt';
 
 /**
  * Represents an event that can be handled by the state machine.
@@ -79,9 +80,9 @@ export class StateNode<E extends MachineEvent, C = unknown> {
   private children: StateNode<E, C>[] = [];
   private parentStateNode: StateNode<E, C> | undefined;
   private timers: ReturnType<typeof setTimeout>[] = [];
-  private handlers: Partial<{
-    [K in E['type']]: EventHandler<Extract<E, { type: K }>, C>;
-  }> = {};
+  private emitter: Emitter<{
+    [K in E['type']]: Extract<E, { type: K }>;
+  }> = mitt();
 
   readonly id: string;
 
@@ -108,7 +109,7 @@ export class StateNode<E extends MachineEvent, C = unknown> {
   }
 
   removeChild(child: StateNode<E, C>) {
-    child.parentStateNode = null;
+    child.parentStateNode = undefined;
     this.children = this.children.filter((c) => c !== child);
   }
 
@@ -118,6 +119,9 @@ export class StateNode<E extends MachineEvent, C = unknown> {
       initial?: boolean;
       onEntry?: EntryHandler<C, E>;
       onExit?: ExitHandler<C, E>;
+      on?: {
+        [K in E['type']]?: EventHandler<Extract<E, { type: K }>, C>;
+      };
     },
   ) {
     const child = new StateNode<E, C>({
@@ -128,6 +132,16 @@ export class StateNode<E extends MachineEvent, C = unknown> {
     child.onEntry = options?.onEntry;
     child.onExit = options?.onExit;
 
+    if (options?.on) {
+      for (const [eventType, handler] of Object.entries(options.on)) {
+        // Type assertion is safe since options.on is constrained by the type definition
+        child.setHandler(
+          eventType as E['type'],
+          handler as EventHandler<Extract<E, { type: E['type'] }>, C>,
+        );
+      }
+    }
+
     this.addChild(child);
 
     return child;
@@ -137,25 +151,45 @@ export class StateNode<E extends MachineEvent, C = unknown> {
     eventType: T,
     handler: EventHandler<Extract<E, { type: T }>, C>,
   ) {
-    this.handlers[eventType] = handler;
-  }
+    // Store handler reference for cleanup
+    const boundHandler = (event: Extract<E, { type: T }>) => {
+      if (!this.active) return;
 
-  dispatchEvent(event: E) {
-    if (this.active) {
-      const handler = this.handlers[event.type as E['type']];
-
-      if (handler) {
+      try {
         const targetId = handler({
-          event: event as Extract<E, { type: E['type'] }>,
+          event,
           context: this.getContext(),
           setContext: this.setContext.bind(this),
           updateContext: this.updateContext.bind(this),
         });
 
         if (targetId) {
-          this.transitionTo(targetId, event);
+          // Validate targetId exists before transition
+          const targetState = this.getStateById(targetId);
+          if (!targetState) {
+            throw new StateRegistryError(
+              `Invalid transition: State '${targetId}' does not exist`,
+            );
+          }
+          this.transitionTo(targetId, event as E);
         }
+      } catch (error) {
+        // Preserve error chain while adding context
+        throw error instanceof Error
+          ? new StateRegistryError(
+              `Error handling event '${eventType}' in state '${this.id}': ${error.message}`,
+            )
+          : error;
       }
+    };
+
+    // Register the handler
+    this.emitter.on(eventType, boundHandler);
+  }
+
+  dispatchEvent(event: E) {
+    if (this.active) {
+      this.emitter.emit(event.type, event);
 
       for (const child of this.children) {
         child.dispatchEvent(event);
@@ -166,48 +200,36 @@ export class StateNode<E extends MachineEvent, C = unknown> {
   transitionTo(targetId: string, event: E) {
     invariant(this.parentStateNode, 'Parent state node not found');
 
-    // Start search from parent state node
+    // Find target state by searching up through ancestors
     let targetState = this.getStateById(targetId, this);
-    let searchState: StateNode<E, C> | undefined = this.parentStateNode;
+    let commonAncestor: StateNode<E, C> | undefined = this.parentStateNode;
 
     if (!targetState) {
-      while (searchState) {
-        const found = searchState.getStateById(targetId);
-
-        if (found) {
-          targetState = found;
-
-          break;
-        }
-
-        searchState = searchState.parentStateNode;
+      while (commonAncestor) {
+        targetState = commonAncestor.getStateById(targetId);
+        if (targetState) break;
+        commonAncestor = commonAncestor.parentStateNode;
       }
     }
 
     invariant(targetState, `State with ID ${targetId} not found`);
+    invariant(commonAncestor, 'Common ancestor not found');
 
-    // eslint-disable-next-line @typescript-eslint/no-this-alias
-    let currentState: StateNode<E, C> = this;
+    // Exit states from current up to common ancestor
+    let currentState: StateNode<E, C> = this; // eslint-disable-line @typescript-eslint/no-this-alias
+    const statesToEnter: StateNode<E, C>[] = [];
 
-    while (currentState !== searchState) {
-      currentState = currentState.parentStateNode!;
+    // Find path to common ancestor while exiting states
+    while (currentState !== commonAncestor) {
       currentState.exit(event);
-    }
-
-    const nodes: StateNode<E, C>[] = [];
-
-    while (currentState !== searchState) {
-      nodes.push(currentState);
       currentState = currentState.parentStateNode!;
+      statesToEnter.push(currentState);
     }
 
-    nodes.reverse().forEach((node) => {
-      node.enter(event);
-    });
+    // Enter states from common ancestor to target
+    statesToEnter.reverse().forEach((state) => state.enter(event));
 
-    // Exit the current state
-    this.exit(event);
-    // Enter the target state
+    // Finally enter target state
     targetState.enter(event);
   }
 
@@ -365,12 +387,12 @@ export class StateNode<E extends MachineEvent, C = unknown> {
   }
 
   cleanup() {
+    // Clear all event listeners
+    this.emitter.all.clear();
+
     // Clear all timers
     this.timers.forEach(clearTimeout);
     this.timers = [];
-
-    // Clear all handlers
-    this.handlers = {};
 
     // Recursively cleanup children
     this.children.forEach((child) => child.cleanup());

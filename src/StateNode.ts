@@ -1,5 +1,4 @@
 // State.ts
-import { SerialisedState, type MachineContext } from './StateMachine';
 
 /**
  * Represents an event that can be handled by the state machine.
@@ -20,9 +19,11 @@ export type MachineEvent<D = unknown> = {
 type AfterCallback<C> = ({
   context,
   setContext,
+  updateContext,
 }: {
   context: C;
   setContext: (context: C) => void;
+  updateContext: (callback: (context: C) => C) => void;
 }) => Promise<string | void> | string | void;
 
 /**
@@ -36,7 +37,6 @@ type AfterCallback<C> = ({
 export type EntryHandler<C, E> = (params: {
   after: (ms: number, callback: AfterCallback<C>) => void;
   context: C;
-  setContext: (context: C | ((context: C) => C)) => C;
   event: E;
 }) => Promise<string | void> | string | void;
 
@@ -47,7 +47,6 @@ export type EntryHandler<C, E> = (params: {
  */
 export type ExitHandler<C, E> = (params: {
   context: C;
-  setContext: (context: C) => void;
   event: E;
 }) => Promise<void>;
 
@@ -63,6 +62,7 @@ export type EventHandler<E, C> = (params: {
   event: E;
   context: C;
   setContext: (context: C) => void;
+  updateContext: (callback: (context: C) => C) => void;
 }) => string | void;
 
 export class StateRegistryError extends Error {
@@ -73,106 +73,64 @@ export class StateRegistryError extends Error {
 }
 
 export class StateNode<E extends MachineEvent, C = unknown> {
-  /**
-   * Collection of child states.
-   */
+  private context: C;
   private children: StateNode<E, C>[] = [];
-  private parentStateNode: StateNode<E, C> | null;
-  /**
-   * Active timers managed by this state.
-   */
+  private parentStateNode: StateNode<E, C> | null = null;
   private timers: ReturnType<typeof setTimeout>[] = [];
   private handlers: Partial<{
     [K in E['type']]: EventHandler<Extract<E, { type: K }>, C>;
   }> = {};
-  private machineContext: MachineContext<E, C>;
 
-  /**
-   * The unique identifier for this state.
-   */
   readonly id: string;
 
-  /**
-   * Handler called when entering this state.
-   * Can return a new state ID to transition to, or void to remain in the current state.
-   */
   onEntry?: EntryHandler<C, E>;
-
-  /**
-   * Handler called when exiting this state.
-   * Performs cleanup operations before transitioning to a new state.
-   */
   onExit?: ExitHandler<C, E>;
 
-  /**
-   * The ID of the initial child state to enter when this state becomes active.
-   * Only applicable for states with children.
-   */
   initialChildId?: string;
-
-  /**
-   * Specifies how state history should be preserved when re-entering this state.
-   * - 'shallow': Preserves the immediate active child state
-   * - 'deep': Preserves the entire subtree of active states
-   */
   history?: 'shallow' | 'deep';
-
-  /**
-   * When true, all child states can be active simultaneously.
-   * When false, only one child state can be active at a time.
-   * @default false
-   */
   parallel = false;
-
-  /**
-   * Indicates whether this state is currently active in the state machine.
-   * @default false
-   */
   active = false;
 
-  /**
-   * The initial child state ID, if specified in config
-   */
-  initial?: string;
-
-  constructor(params: {
-    events?: E;
-    id: string;
-    parentStateNode: StateNode<E, C> | null;
-    machineContext: MachineContext<E, C>;
-    children?: StateNode<E, C>;
-  }) {
+  constructor(params: { events?: E; id: string; context?: C }) {
     this.id = params.id;
-    this.parentStateNode = params.parentStateNode;
-    this.machineContext = params.machineContext;
+    this.context = params.context ?? ({} as C);
   }
 
-  /**
-   * Adds a child state to the current state.
-   *
-   * @param child - The child state to add.
-   * @throws {StateRegistryError} When attempting to register a duplicate state ID
-   */
-  addChild(child: StateNode<E, C>) {
+  addChild(child: StateNode<E, C>, initial?: boolean) {
+    child.parentStateNode = this;
     this.children.push(child);
 
-    if (this.machineContext.stateRegistry.has(child.id)) {
-      this.children.pop(); // Remove the child we just added
-
-      throw new StateRegistryError(
-        `Cannot register state: ID "${child.id}" is already registered in the state machine.`,
-      );
+    if (initial) {
+      this.initialChildId = child.id;
     }
-
-    this.machineContext.stateRegistry.set(child.id, child);
   }
 
-  /**
-   * Registers an event handler for a specific event type.
-   *
-   * @param eventType - The type of event to listen for.
-   * @param handler - The function to call when the specified event is received.
-   */
+  removeChild(child: StateNode<E, C>) {
+    child.parentStateNode = null;
+    this.children = this.children.filter((c) => c !== child);
+  }
+
+  createChild(
+    id: string,
+    options?: {
+      initial?: boolean;
+      onEntry?: EntryHandler<C, E>;
+      onExit?: ExitHandler<C, E>;
+    },
+  ) {
+    const child = new StateNode<E, C>({
+      id,
+      context: this.context,
+    });
+
+    child.onEntry = options?.onEntry;
+    child.onExit = options?.onExit;
+
+    this.addChild(child);
+
+    return child;
+  }
+
   setHandler<T extends E['type']>(
     eventType: T,
     handler: EventHandler<Extract<E, { type: T }>, C>,
@@ -180,92 +138,49 @@ export class StateNode<E extends MachineEvent, C = unknown> {
     this.handlers[eventType] = handler;
   }
 
-  /**
-   * Notifies listeners of an event and propagates it to child states if specified.
-   *
-   * @param event - The event to notify listeners of.
-   * @param trickleDown - Whether to trickle down the event to child states.
-   */
-  notifyHandlers(params: { event: E; trickleDown?: boolean }) {
-    const { event, trickleDown = true } = params;
-
+  dispatchEvent(event: E) {
     if (this.active) {
       const handler = this.handlers[event.type as E['type']];
 
       if (handler) {
         const targetId = handler({
           event: event as Extract<E, { type: E['type'] }>,
-          context: this.machineContext.context,
-          setContext: this.machineContext.setContext,
+          context: this.getContext(),
+          setContext: this.setContext.bind(this),
+          updateContext: this.updateContext.bind(this),
         });
 
         if (targetId) {
-          this.transitionTo({ targetId, event });
+          this.transitionTo(targetId, event);
         }
       }
-    }
 
-    if (trickleDown) {
-      this.notifyChildren(event);
+      for (const child of this.children) {
+        child.dispatchEvent(event);
+      }
     }
   }
 
-  /**
-   * Transitions the state machine to a new state.
-   *
-   * @param targetId - The identifier of the target state to transition to.
-   * @param event - The event to transition to the target state with.
-   */
-  transitionTo(params: { targetId: string; event: E }) {
-    const { targetId, event } = params;
+  transitionTo(targetId: string, event: E) {
     // Retrieve the target state by its identifier
     const targetState = this.getStateById(targetId);
 
     // Exit the current state
-    this.exit({ event });
+    this.exit(event);
     // Enter the target state
-    targetState.enter({ event });
-    // Notify all listeners of the state change
-    this.machineContext.notifyHandlers(event);
+    targetState.enter(event);
   }
 
-  /**
-   * Notifies all active child states of an event.
-   *
-   * @param event - The event to notify the child states of.
-   */
-  notifyChildren(event: E) {
-    // Iterate over all active child states
-    for (const child of this.getActiveChildren()) {
-      // Notify each active child state of the event
-      child.notifyHandlers({ event });
-    }
+  getActiveState(currentStateNode: StateNode<E, C>) {
+    return currentStateNode.getStateById(this.id);
   }
 
-  /**
-   * Registers a listener for a specific event type.
-   *
-   * @template T - The type of the event to listen for.
-   * @param eventType - The type of the event to listen for.
-   * @param handler - The function to call when the event is received.
-   */
-  on<T extends E['type']>(
-    eventType: T,
-    handler: EventHandler<Extract<E, { type: T }>, C>,
-  ) {
-    this.setHandler(eventType, handler);
-  }
-
-  /**
-   * Enters the state, making it active and handling any necessary transitions or child state entries.
-   */
-  async enter(params: { serialisedState?: SerialisedState; event: E }) {
-    const { serialisedState, event } = params;
+  async enter(event: E) {
     // Set the state as active
     this.active = true;
 
     // Bind the after function to the current state context
-    const { context, setContext } = this.machineContext;
+    const context = this.getContext();
     const after = this.after.bind(this);
 
     // Check if there's an onEntry handler and execute it if present
@@ -274,27 +189,13 @@ export class StateNode<E extends MachineEvent, C = unknown> {
       const targetId = await this.onEntry({
         after,
         context,
-        setContext,
         event,
       });
 
       // If the onEntry handler returns a targetId, transition to that state
       if (targetId) {
-        this.transitionTo({ targetId, event });
+        this.transitionTo(targetId, event);
       }
-    }
-
-    // If a serialised state is provided, transition to it
-    if (serialisedState) {
-      if (typeof serialisedState === 'string') {
-        this.transitionTo({ targetId: serialisedState as string, event });
-      } else if (!this.parallel && this.children.length > 0) {
-        this.children.forEach((child) => {
-          child.enter({ serialisedState: serialisedState[child.id], event });
-        });
-      }
-
-      return;
     }
 
     // If there are no children, exit the function early
@@ -306,7 +207,7 @@ export class StateNode<E extends MachineEvent, C = unknown> {
     if (this.parallel) {
       // If parallel, enter all child states
       for (const child of this.children) {
-        child.enter({ event });
+        child.enter(event);
       }
     } else {
       // Select the first initial child state or the first child state if no initial state is found
@@ -319,22 +220,11 @@ export class StateNode<E extends MachineEvent, C = unknown> {
       }
 
       // Enter the selected initial child state
-      initialChild.enter({ event });
+      initialChild.enter(event);
     }
   }
 
-  /**
-   * Exits the state, deactivating it and clearing all timers.
-   * If preserveHistory is not specified or false, the state is deactivated.
-   * If preserveHistory is 'shallow' or 'deep', the state's history is preserved.
-   * If the onExit handler is defined, it is executed.
-   * If the state has active children, they are exited, preserving history if specified.
-   *
-   * @param preserveHistory - If 'shallow' or 'deep', the state's history is preserved.
-   */
-  async exit(params: { preserveHistory?: 'shallow' | 'deep'; event: E }) {
-    const { preserveHistory, event } = params;
-
+  async exit(event: E, preserveHistory?: 'shallow' | 'deep') {
     // Perform cleanup unless we're preserving history
     if (!preserveHistory) {
       this.cleanup();
@@ -345,18 +235,8 @@ export class StateNode<E extends MachineEvent, C = unknown> {
     this.timers.forEach(clearTimeout);
     this.timers = [];
 
-    const { context, setContext: originalSetContext } = this.machineContext;
-    const wrappedSetContext = (contextOrFn: C | ((context: C) => C)) => {
-      const newContext =
-        typeof contextOrFn === 'function'
-          ? (contextOrFn as (context: C) => C)(context)
-          : contextOrFn;
-      return originalSetContext(newContext);
-    };
-
     await this.onExit?.({
-      context,
-      setContext: wrappedSetContext,
+      context: this.getContext(),
       event,
     });
 
@@ -365,93 +245,81 @@ export class StateNode<E extends MachineEvent, C = unknown> {
       preserveHistory === 'deep' ? 'deep' : this.history;
     this.children.forEach((child) => {
       if (child.active) {
-        child.exit({ preserveHistory: historyToPreserve, event });
+        child.exit(event, historyToPreserve);
       }
     });
   }
 
-  /**
-   * Schedules a transition to a new state after a specified delay.
-   *
-   * @param ms - The delay in milliseconds before transitioning to the new state.
-   * @param callback - A function that returns the ID of the state to transition to.
-   */
   after(ms: number, callback: AfterCallback<C>) {
-    const { context, setContext } = this.machineContext;
-
     // Create a timer that will execute the callback function after the specified delay
     const timer = setTimeout(async () => {
       // Execute the callback function to get the ID of the state to transition to
-      const stateId = await callback({ context, setContext });
-      // Transition to the new state
-      this.transitionTo({
-        targetId: stateId as string,
-        event: { type: 'AFTER_DELAY' } as E,
+      const stateId = await callback({
+        context: this.getContext(),
+        setContext: this.setContext.bind(this),
+        updateContext: this.updateContext.bind(this),
       });
+
+      if (stateId) {
+        // Transition to the new state
+        this.transitionTo(stateId as string, { type: 'AFTER_DELAY' } as E);
+      }
     }, ms);
 
     // Store the timer to ensure it can be cleared later if necessary
     this.timers.push(timer);
   }
 
-  /**
-   * Returns an array of active children of the state.
-   * Active children are those that have their active property set to true.
-   *
-   * @returns {StateNode<E, S>[]} - An array of active children of the state.
-   */
   getActiveChildren(): StateNode<E, C>[] {
     return this.children.filter((child) => child.active);
   }
 
-  /**
-   * Finds and returns a child state by its ID.
-   *
-   * @param id - The ID of the child state to find.
-   * @returns {StateNode<E, S>} - The child state with the specified ID, or undefined if not found.
-   */
-  getChildById(id: string) {
+  getChildStateById(id: string) {
     return this.children.find((child) => child.id === id);
   }
 
-  /**
-   * Finds and returns a sibling state by its ID.
-   *
-   * @param id - The ID of the sibling state to find.
-   * @returns {StateNode<E, S>} - The sibling state with the specified ID, or undefined if not found.
-   */
-  getSiblingById(id: string) {
+  getSiblingStateById(id: string) {
+    if (!this.parentStateNode) {
+      return undefined;
+    }
+
     // Attempt to find the sibling state by its ID through the parent state
-    return this.parentStateNode?.getChildById(id);
+    return this.parentStateNode.getChildStateById(id);
   }
 
-  /**
-   * Finds and returns a state by its ID, searching through children, siblings, and the state registry.
-   *
-   * @param id - The ID of the state to find.
-   * @returns {StateNode<E, S>} - The state with the specified ID, or throws an error if not found.
-   * @throws {Error} When the state is not found
-   */
-  getStateById(id: string) {
-    // Attempt to find the state by its ID through children, siblings, and the state registry
-    const state =
-      this.getChildById(id) ??
-      this.getSiblingById(id) ??
-      this.machineContext.stateRegistry.get(id);
+  getRootState(): StateNode<E, C> {
+    return this.parentStateNode?.getRootState() ?? this;
+  }
 
-    // If the state is not found, throw an error
+  findDescendantStateById(
+    id: string,
+    currentStateNode: StateNode<E, C> = this.getRootState(),
+  ): StateNode<E, C> | undefined {
+    // If the current state node is the target state, return it
+    if (currentStateNode.id === id) {
+      return currentStateNode;
+    }
+
+    // Recursively search through the children of the current state node
+    return currentStateNode.children.find((child) => {
+      return child.findDescendantStateById(id);
+    });
+  }
+
+  getStateById(id: string) {
+    // Attempt to find the state by its ID through children, siblings, and descendants
+    const state =
+      this.getChildStateById(id) ??
+      this.getSiblingStateById(id) ??
+      this.findDescendantStateById(id);
+
     if (!state) {
       throw new Error(`State with id ${id} not found`);
     }
 
-    // Return the found state
     return state;
   }
 
-  /**
-   * Cleans up all resources associated with this state and its children.
-   * This includes timers and any registered handlers.
-   */
   cleanup() {
     // Clear all timers
     this.timers.forEach(clearTimeout);
@@ -462,5 +330,29 @@ export class StateNode<E extends MachineEvent, C = unknown> {
 
     // Recursively cleanup children
     this.children.forEach((child) => child.cleanup());
+  }
+
+  setContext(context: C) {
+    if (this.context) {
+      this.context = context;
+    } else {
+      try {
+        this.parentStateNode!.setContext(context);
+      } catch {
+        throw new Error('Context not found in current or parent state nodes');
+      }
+    }
+  }
+
+  getContext(): C {
+    try {
+      return this.context ?? this.parentStateNode!.getContext()!;
+    } catch {
+      throw new Error('Context not found in current or parent state nodes');
+    }
+  }
+
+  updateContext(callback: (context: C) => C) {
+    this.setContext(callback(this.getContext()));
   }
 }

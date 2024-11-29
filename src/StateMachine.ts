@@ -197,7 +197,7 @@ export class StateMachine<E extends MachineEvent, C = unknown> {
           childId as string,
         );
 
-        state.addChild(childState as StateNode<E, C>);
+        state.addChildState(childState as StateNode<E, C>);
       }
     }
 

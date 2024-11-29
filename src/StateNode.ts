@@ -2,6 +2,10 @@
 
 import { invariant } from './lib';
 
+export type SerialisedState<S = string> =
+  | S
+  | { [K in string]: SerialisedState<S> };
+
 /**
  * Represents an event that can be handled by the state machine.
  *
@@ -39,7 +43,6 @@ type AfterCallback<C> = ({
 export type EntryHandler<C, E> = (params: {
   after: (ms: number, callback: AfterCallback<C>) => void;
   context: C;
-  event: E;
 }) => Promise<string | void> | string | void;
 
 /**
@@ -47,10 +50,17 @@ export type EntryHandler<C, E> = (params: {
  *
  * @returns Void.
  */
-export type ExitHandler<C, E> = (params: {
+export type ExitHandler<C, E> = (params: { context: C }) => Promise<void>;
+
+/**
+ * A handler function that is called when a transition is made.
+ *
+ * @returns Void.
+ */
+export type TransitionHandler<C> = (params: {
+  state: SerialisedState<string>;
   context: C;
-  event: E;
-}) => Promise<void>;
+}) => Promise<void> | void;
 
 /**
  * A handler function that is called when an event is handled.
@@ -74,6 +84,17 @@ export class StateRegistryError extends Error {
   }
 }
 
+type StateNodeOptions<E extends MachineEvent, C> = {
+  id: string;
+  context?: C;
+  onEntry?: EntryHandler<C, E>;
+  onExit?: ExitHandler<C, E>;
+  onTransition?: TransitionHandler<C>;
+  on?: {
+    [K in E['type']]?: EventHandler<Extract<E, { type: K }>, C>;
+  };
+};
+
 export class StateNode<E extends MachineEvent, C = unknown> {
   private context: C;
   private children: StateNode<E, C>[] = [];
@@ -87,18 +108,32 @@ export class StateNode<E extends MachineEvent, C = unknown> {
 
   onEntry?: EntryHandler<C, E>;
   onExit?: ExitHandler<C, E>;
+  onTransition?: TransitionHandler<C>;
 
   initialChildId?: string;
   history?: 'shallow' | 'deep';
   parallel = false;
   active = false;
 
-  constructor(params: { events?: E; id: string; context?: C }) {
-    this.id = params.id;
-    this.context = params.context ?? ({} as C);
+  constructor(options: StateNodeOptions<E, C>) {
+    this.id = options.id;
+    this.context = options.context ?? ({} as C);
+
+    this.onEntry = options.onEntry;
+    this.onExit = options.onExit;
+    this.onTransition = options.onTransition;
+
+    if (options.on) {
+      for (const [eventType, handler] of Object.entries(options.on)) {
+        this.setHandler(
+          eventType as E['type'],
+          handler as EventHandler<Extract<E, { type: E['type'] }>, C>,
+        );
+      }
+    }
   }
 
-  addChild(child: StateNode<E, C>, initial?: boolean) {
+  addChildState(child: StateNode<E, C>, initial?: boolean) {
     child.parentStateNode = this;
     this.children.push(child);
 
@@ -107,43 +142,25 @@ export class StateNode<E extends MachineEvent, C = unknown> {
     }
   }
 
-  removeChild(child: StateNode<E, C>) {
+  removeChildState(child: StateNode<E, C>) {
     child.parentStateNode = undefined;
     this.children = this.children.filter((c) => c !== child);
   }
 
-  createChild(
-    id: string,
-    options?: {
-      initial?: boolean;
-      onEntry?: EntryHandler<C, E>;
-      onExit?: ExitHandler<C, E>;
-      on?: {
-        [K in E['type']]?: EventHandler<Extract<E, { type: K }>, C>;
-      };
-    },
-  ) {
+  appendChild(params: {
+    id: string;
+    onEntry?: EntryHandler<C, E>;
+    onExit?: ExitHandler<C, E>;
+    on?: {
+      [K in E['type']]?: EventHandler<Extract<E, { type: K }>, C>;
+    };
+  }) {
     const child = new StateNode<E, C>({
-      id,
+      id: params.id,
       context: this.context,
     });
 
-    child.onEntry = options?.onEntry;
-    child.onExit = options?.onExit;
-
-    if (options?.on) {
-      for (const [eventType, handler] of Object.entries(options.on)) {
-        // Type assertion is safe since options.on is constrained by the type definition
-        child.setHandler(
-          eventType as E['type'],
-          handler as EventHandler<Extract<E, { type: E['type'] }>, C>,
-        );
-      }
-    }
-
-    this.addChild(child);
-
-    return child;
+    this.addChildState(child);
   }
 
   setHandler<T extends E['type']>(
@@ -166,7 +183,7 @@ export class StateNode<E extends MachineEvent, C = unknown> {
         });
 
         if (targetId) {
-          this.transitionTo(targetId, event);
+          this.transitionTo(targetId);
         }
       }
 
@@ -176,7 +193,7 @@ export class StateNode<E extends MachineEvent, C = unknown> {
     }
   }
 
-  transitionTo(targetId: string, event: E) {
+  transitionTo(targetId: string) {
     invariant(this.parentStateNode, 'Parent state node not found');
 
     // Find target state by searching up through ancestors
@@ -200,23 +217,28 @@ export class StateNode<E extends MachineEvent, C = unknown> {
 
     // Find path to common ancestor while exiting states
     while (currentState !== commonAncestor) {
-      currentState.exit(event);
+      currentState.exit();
       currentState = currentState.parentStateNode!;
       statesToEnter.push(currentState);
     }
 
     // Enter states from common ancestor to target
-    statesToEnter.reverse().forEach((state) => state.enter(event));
+    statesToEnter.reverse().forEach((state) => state.enter());
 
     // Finally enter target state
-    targetState.enter(event);
+    targetState.enter();
+
+    this.onTransition?.({
+      state: this.serialiseState(),
+      context: this.getContext(),
+    });
   }
 
   getActiveState(currentStateNode: StateNode<E, C>) {
     return currentStateNode.getStateById(this.id);
   }
 
-  async enter(event: E) {
+  async enter() {
     // Set the state as active
     this.active = true;
 
@@ -224,31 +246,29 @@ export class StateNode<E extends MachineEvent, C = unknown> {
     const context = this.getContext();
     const after = this.after.bind(this);
 
-    // Check if there's an onEntry handler and execute it if present
-    if (this.onEntry) {
-      // Execute the onEntry handler, passing the bound after function
-      const targetId = await this.onEntry({
+    const entryPromise = Promise.resolve(
+      this.onEntry?.({
         after,
         context,
-        event,
-      });
-
-      // If the onEntry handler returns a targetId, transition to that state
+      }),
+    ).then((targetId) => {
       if (targetId) {
-        this.transitionTo(targetId, event);
+        this.transitionTo(targetId);
       }
-    }
+    });
 
     // If there are no children, exit the function early
     if (this.children.length === 0) {
       return;
     }
 
+    const childEnterPromises: Promise<void>[] = [];
+
     // Check if the state is parallel, meaning it can have multiple active child states
     if (this.parallel) {
       // If parallel, enter all child states
       for (const child of this.children) {
-        child.enter(event);
+        childEnterPromises.push(child.enter());
       }
     } else {
       // Select the first initial child state or the first child state if no initial state is found
@@ -261,11 +281,13 @@ export class StateNode<E extends MachineEvent, C = unknown> {
       }
 
       // Enter the selected initial child state
-      initialChild.enter(event);
+      childEnterPromises.push(initialChild.enter());
     }
+
+    await Promise.all([entryPromise, ...childEnterPromises]);
   }
 
-  async exit(event: E, preserveHistory?: 'shallow' | 'deep') {
+  async exit(preserveHistory?: 'shallow' | 'deep') {
     // Perform cleanup unless we're preserving history
     if (!preserveHistory) {
       this.cleanup();
@@ -276,19 +298,21 @@ export class StateNode<E extends MachineEvent, C = unknown> {
     this.timers.forEach(clearTimeout);
     this.timers = [];
 
-    await this.onExit?.({
+    const exitPromise = this.onExit?.({
       context: this.getContext(),
-      event,
     });
 
     // Exit active children, preserving history if specified
     const historyToPreserve =
       preserveHistory === 'deep' ? 'deep' : this.history;
-    this.children.forEach((child) => {
-      if (child.active) {
-        child.exit(event, historyToPreserve);
-      }
-    });
+
+    const childExitPromises = this.children
+      .filter((child) => child.active)
+      .map((child) => child.exit(historyToPreserve));
+
+    const promises = [exitPromise, ...childExitPromises];
+
+    await Promise.all(promises);
   }
 
   after(ms: number, callback: AfterCallback<C>) {
@@ -303,7 +327,7 @@ export class StateNode<E extends MachineEvent, C = unknown> {
 
       if (stateId) {
         // Transition to the new state
-        this.transitionTo(stateId as string, { type: 'AFTER_DELAY' } as E);
+        this.transitionTo(stateId as string);
       }
     }, ms);
 
@@ -361,8 +385,6 @@ export class StateNode<E extends MachineEvent, C = unknown> {
       // Add children to queue to continue search
       queue.push(...node.children);
     }
-
-    return undefined;
   }
 
   cleanup() {
@@ -397,5 +419,27 @@ export class StateNode<E extends MachineEvent, C = unknown> {
 
   updateContext(callback: (context: C) => C) {
     this.setContext(callback(this.getContext()));
+  }
+
+  /**
+   * Serialises the state of the state machine into a serialised state object.
+   *
+   * @param state - The state to serialise.
+   * @returns The serialised state.
+   */
+  serialiseState(state = this): SerialisedState<string> {
+    const activeChildren = state.getActiveChildren();
+
+    if (activeChildren.length === 1) {
+      return activeChildren[0].id as unknown as string;
+    }
+
+    return state.getActiveChildren().reduce(
+      (acc, state) => {
+        acc[state.id as string] = state.serialiseState();
+        return acc;
+      },
+      {} as Record<string, SerialisedState<string>>,
+    );
   }
 }

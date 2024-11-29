@@ -6,7 +6,7 @@
       "request": "launch",
       "name": "Debug Current File",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["tsx", "--preserve-symlinks"],
+      "runtimeArgs": ["tsx", "--preserve-symlinks", "--watch"],
       "args": ["${file}"],
       "skipFiles": ["<node_internals>/**"],
       "outFiles": ["${workspaceFolder}/**/*.js"],
@@ -14,7 +14,8 @@
       "resolveSourceMapLocations": [
         "${workspaceFolder}/**",
         "!**/node_modules/**"
-      ]
+      ],
+      "console": "integratedTerminal"
     },
     {
       "type": "node",

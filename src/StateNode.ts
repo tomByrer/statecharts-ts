@@ -40,7 +40,7 @@ type AfterCallback<C> = ({
  * @param params.after - A function to schedule a callback to run after a delay.
  * @returns The state identifier or void.
  */
-export type EntryHandler<C, E> = (params: {
+export type EntryHandler<C> = (params: {
   after: (ms: number, callback: AfterCallback<C>) => void;
   context: C;
 }) => Promise<string | void> | string | void;
@@ -50,7 +50,7 @@ export type EntryHandler<C, E> = (params: {
  *
  * @returns Void.
  */
-export type ExitHandler<C, E> = (params: { context: C }) => Promise<void>;
+export type ExitHandler<C> = (params: { context: C }) => Promise<void>;
 
 /**
  * A handler function that is called when a transition is made.
@@ -87,9 +87,8 @@ export class StateRegistryError extends Error {
 type StateNodeOptions<E extends MachineEvent, C> = {
   id: string;
   context?: C;
-  onEntry?: EntryHandler<C, E>;
-  onExit?: ExitHandler<C, E>;
-  onTransition?: TransitionHandler<C>;
+  onEntry?: EntryHandler<C>;
+  onExit?: ExitHandler<C>;
   on?: {
     [K in E['type']]?: EventHandler<Extract<E, { type: K }>, C>;
   };
@@ -106,9 +105,8 @@ export class StateNode<E extends MachineEvent, C = unknown> {
 
   readonly id: string;
 
-  onEntry?: EntryHandler<C, E>;
-  onExit?: ExitHandler<C, E>;
-  onTransition?: TransitionHandler<C>;
+  onEntry?: EntryHandler<C>;
+  onExit?: ExitHandler<C>;
 
   initialChildId?: string;
   history?: 'shallow' | 'deep';
@@ -121,7 +119,6 @@ export class StateNode<E extends MachineEvent, C = unknown> {
 
     this.onEntry = options.onEntry;
     this.onExit = options.onExit;
-    this.onTransition = options.onTransition;
 
     if (options.on) {
       for (const [eventType, handler] of Object.entries(options.on)) {
@@ -149,8 +146,8 @@ export class StateNode<E extends MachineEvent, C = unknown> {
 
   appendChild(params: {
     id: string;
-    onEntry?: EntryHandler<C, E>;
-    onExit?: ExitHandler<C, E>;
+    onEntry?: EntryHandler<C>;
+    onExit?: ExitHandler<C>;
     on?: {
       [K in E['type']]?: EventHandler<Extract<E, { type: K }>, C>;
     };
@@ -170,10 +167,12 @@ export class StateNode<E extends MachineEvent, C = unknown> {
     this.handlers[eventType] = handler;
   }
 
-  dispatchEvent(event: E) {
+  dispatch(event: E) {
+    // Only dispatch events if the state is active
     if (this.active) {
       const handler = this.handlers[event.type as E['type']];
 
+      // If the handler exists, dispatch the event
       if (handler) {
         const targetId = handler({
           event: event as Extract<E, { type: E['type'] }>,
@@ -182,13 +181,15 @@ export class StateNode<E extends MachineEvent, C = unknown> {
           updateContext: this.updateContext.bind(this),
         });
 
+        // If the handler returns a targetId, transition to that state
         if (targetId) {
           this.transitionTo(targetId);
         }
       }
 
+      // Dispatch the event to all children
       for (const child of this.children) {
-        child.dispatchEvent(event);
+        child.dispatch(event);
       }
     }
   }
@@ -227,11 +228,6 @@ export class StateNode<E extends MachineEvent, C = unknown> {
 
     // Finally enter target state
     targetState.enter();
-
-    this.onTransition?.({
-      state: this.serialiseState(),
-      context: this.getContext(),
-    });
   }
 
   getActiveState(currentStateNode: StateNode<E, C>) {
@@ -239,6 +235,7 @@ export class StateNode<E extends MachineEvent, C = unknown> {
   }
 
   async enter() {
+    console.log('Entering state', this.id);
     // Set the state as active
     this.active = true;
 
@@ -316,6 +313,7 @@ export class StateNode<E extends MachineEvent, C = unknown> {
   }
 
   after(ms: number, callback: AfterCallback<C>) {
+    console.log('Scheduling callback', ms, callback);
     // Create a timer that will execute the callback function after the specified delay
     const timer = setTimeout(async () => {
       // Execute the callback function to get the ID of the state to transition to

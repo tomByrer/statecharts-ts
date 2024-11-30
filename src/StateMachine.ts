@@ -304,7 +304,7 @@ export class StateMachine<E extends MachineEvent, C = unknown> {
     }
 
     try {
-      this.rootState.dispatchEvent({ event });
+      this.rootState.dispatch({ event });
     } catch (error) {
       throw new StateMachineError(
         `Failed to handle event "${event.type}": ${error instanceof Error ? error.message : 'Unknown error'}`,

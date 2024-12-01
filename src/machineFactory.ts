@@ -1,4 +1,10 @@
-import { EventHandler, MachineEvent, StateNode } from './StateNode';
+import {
+  EntryHandler,
+  EventHandler,
+  ExitHandler,
+  MachineEvent,
+  StateNode,
+} from './StateNode';
 
 /**
  * Configuration for a state in the state machine.
@@ -51,12 +57,12 @@ export type NodeConfig<E extends MachineEvent, C = unknown> = {
   /**
    * Entry handler with optional state transition
    */
-  onEntry?: EntryHandler<C, E>;
+  onEntry?: EntryHandler<C>;
 
   /**
    * Exit handler for cleanup operations
    */
-  onExit?: ExitHandler<C, E>;
+  onExit?: ExitHandler<C>;
 };
 
 export type StateRegistry<E extends MachineEvent, C = unknown> = Map<

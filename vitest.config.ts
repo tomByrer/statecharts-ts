@@ -5,7 +5,18 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     coverage: {
-      provider: 'c8',
+      provider: 'v8',
+      reporter: ['json'], // Add required reporters
+      all: true,
+      clean: true,
+      reportsDirectory: './coverage',
+      exclude: [
+        '**/node_modules/**',
+        '**/test/**',
+        '**/*.d.ts',
+        '**/__tests__/**',
+        // Add other exclusions if necessary
+      ],
     },
   },
 });

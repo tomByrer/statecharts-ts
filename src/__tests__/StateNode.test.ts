@@ -1,0 +1,296 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { StateNode, type MachineEvent } from '../StateNode';
+
+interface TestContext {
+  count: number;
+}
+
+type TestEvent = MachineEvent<{ value?: number }>;
+
+describe('StateNode', () => {
+  let rootState: StateNode<TestEvent, TestContext>;
+
+  beforeEach(() => {
+    rootState = new StateNode<TestEvent, TestContext>({
+      id: 'root',
+      context: { count: 0 },
+    });
+  });
+
+  describe('initialization', () => {
+    it('creates a state node with correct initial values', () => {
+      expect(rootState.id).toBe('root');
+      expect(rootState.getContext()).toEqual({ count: 0 });
+      expect(rootState.active).toBe(false);
+    });
+
+    it('updates context through direct setting and updates', () => {
+      rootState.setContext({ count: 1 });
+      expect(rootState.getContext()).toEqual({ count: 1 });
+
+      rootState.updateContext((ctx) => ({ count: ctx.count + 1 }));
+      expect(rootState.getContext()).toEqual({ count: 2 });
+    });
+  });
+
+  describe('lifecycle hooks', () => {
+    it('accepts and stores onEntry and onExit hooks', () => {
+      const onEntry = vi.fn();
+      const onExit = vi.fn();
+
+      const rootState = new StateNode<TestEvent, TestContext>({
+        id: 'root',
+        onEntry,
+        onExit,
+      });
+
+      expect(rootState.onEntry).toBe(onEntry);
+      expect(rootState.onExit).toBe(onExit);
+    });
+  });
+
+  describe('child state management', () => {
+    it('adds child states to parent', () => {
+      const childState = new StateNode<TestEvent, TestContext>({ id: 'child' });
+      const result = rootState.addChildState(childState);
+      expect(result).toBe(rootState);
+      expect(rootState.getChildren()).toContain(childState);
+    });
+
+    it('marks child state as initial state', () => {
+      const childState = new StateNode<TestEvent, TestContext>({ id: 'child' });
+      const result = rootState.addChildState(childState, true);
+      expect(result).toBe(rootState);
+      expect(rootState.initialChildId).toBe(childState.id);
+    });
+  });
+
+  describe('child state removal', () => {
+    it('removes child state from parent', () => {
+      const childState = new StateNode<TestEvent, TestContext>({ id: 'child' });
+      rootState.addChildState(childState);
+      rootState.removeChildState(childState);
+      expect(rootState.getChildren()).not.toContain(childState);
+    });
+
+    it('clears initial state when removed', () => {
+      const childState = new StateNode<TestEvent, TestContext>({ id: 'child' });
+      rootState.addChildState(childState, true);
+      rootState.removeChildState(childState);
+      expect(rootState.initialChildId).toBeUndefined();
+    });
+  });
+
+  describe('child state creation', () => {
+    it('creates and appends new child state', () => {
+      const result = rootState.appendChild({ id: 'child' });
+      expect(rootState.getChildren()).toContain(result);
+    });
+
+    it('marks newly created child as initial state', () => {
+      const result = rootState.appendChild({ id: 'child', initial: true });
+      expect(rootState.initialChildId).toBe(result.id);
+    });
+  });
+
+  describe('context management', () => {
+    it('updates context directly with setContext', () => {
+      rootState.setContext({ count: 1 });
+      expect(rootState.getContext()).toEqual({ count: 1 });
+    });
+
+    it('updates context through transformation function', () => {
+      rootState.updateContext((ctx) => ({ count: ctx.count + 1 }));
+      expect(rootState.getContext()).toEqual({ count: 1 });
+    });
+
+    it('propagates context changes to child states', () => {
+      const childState = new StateNode<TestEvent, TestContext>({ id: 'child' });
+      rootState.addChildState(childState);
+      rootState.setContext({ count: 1 });
+      expect(childState.getContext()).toEqual({ count: 1 });
+    });
+  });
+
+  describe('event handling', () => {
+    it('dispatches events to handlers when active', () => {
+      const handler = vi.fn();
+      const rootState = new StateNode<TestEvent, TestContext>({
+        id: 'root',
+        on: {
+          TEST: handler,
+        },
+      });
+      rootState.enter();
+      rootState.dispatch({ type: 'TEST', data: { value: 42 } });
+      expect(handler).toHaveBeenCalled();
+    });
+
+    it('does not dispatch events to handlers when inactive', () => {
+      const handler = vi.fn();
+      const rootState = new StateNode<TestEvent, TestContext>({
+        id: 'root',
+        on: {
+          TEST: handler,
+        },
+      });
+      rootState.dispatch({ type: 'TEST', data: { value: 42 } });
+      expect(handler).not.toHaveBeenCalled();
+    });
+
+    it('propagates events to child states', () => {
+      const eventHandler = vi.fn();
+      const childState = new StateNode<TestEvent, TestContext>({
+        id: 'child',
+        on: {
+          TEST: eventHandler,
+        },
+      });
+      rootState.addChildState(childState);
+      rootState.enter();
+      rootState.dispatch({ type: 'TEST', data: { value: 42 } });
+      expect(eventHandler).toHaveBeenCalled();
+    });
+  });
+
+  describe('state transitions', () => {
+    describe('transitions initial child state on parent entry', async () => {
+      const childState1 = new StateNode<TestEvent, TestContext>({
+        id: 'child1',
+        onEntry: vi.fn(),
+        onExit: vi.fn(),
+      });
+      const childState2 = new StateNode<TestEvent, TestContext>({
+        id: 'child2',
+        onEntry: vi.fn(),
+        onExit: vi.fn(),
+      });
+
+      it('when initial state is not set', () => {
+        rootState.addChildState(childState1);
+        rootState.addChildState(childState2);
+        rootState.enter();
+
+        expect(childState1.active).toBe(true);
+        expect(childState2.active).toBe(false);
+      });
+
+      it('when initial state is set', () => {
+        rootState.addChildState(childState1);
+        rootState.addChildState(childState2, true);
+        rootState.enter();
+
+        expect(childState1.active).toBe(false);
+        expect(childState2.active).toBe(true);
+      });
+    });
+
+    it('processes events and triggers transitions', () => {
+      const handler = vi.fn().mockReturnValue('target');
+      const transition = vi.spyOn(rootState, 'transition');
+
+      rootState.setTransitionHandler('TEST', handler);
+      rootState.enter();
+
+      rootState.dispatch({ type: 'TEST', data: { value: 42 } });
+
+      expect(handler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: { type: 'TEST', data: { value: 42 } },
+          context: { count: 0 },
+        }),
+      );
+      expect(transition).toHaveBeenCalledWith('target');
+    });
+
+    describe('parallel states', () => {
+      let rootState: StateNode<TestEvent, TestContext>;
+      let child1: StateNode<TestEvent, TestContext>;
+      let child2: StateNode<TestEvent, TestContext>;
+
+      beforeEach(() => {
+        rootState = new StateNode<TestEvent, TestContext>({
+          id: 'root',
+          parallel: true,
+        });
+
+        child1 = new StateNode<TestEvent, TestContext>({
+          id: 'child1',
+          onEntry: vi.fn(),
+          onExit: vi.fn(),
+        });
+
+        child2 = new StateNode<TestEvent, TestContext>({
+          id: 'child2',
+          onEntry: vi.fn(),
+          onExit: vi.fn(),
+        });
+
+        rootState.addChildState(child1);
+        rootState.addChildState(child2);
+      });
+
+      it('activates all child states on enter', async () => {
+        await rootState.enter();
+        expect(child1.active).toBe(true);
+        expect(child2.active).toBe(true);
+      });
+
+      it('deactivates all child states on exit', async () => {
+        await rootState.enter();
+        await rootState.exit();
+        expect(child1.active).toBe(false);
+        expect(child2.active).toBe(false);
+      });
+    });
+  });
+
+  describe('delayed transitions', () => {
+    it('executes transitions after specified delay', async () => {
+      vi.useFakeTimers();
+
+      const callback = vi.fn().mockReturnValue('next');
+      const transition = vi.spyOn(rootState, 'transition');
+
+      rootState.after(1000, callback);
+
+      vi.advanceTimersByTime(1000);
+      await vi.runAllTimersAsync();
+
+      expect(callback).toHaveBeenCalled();
+      expect(transition).toHaveBeenCalledWith('next');
+
+      vi.useRealTimers();
+    });
+  });
+
+  describe('cleanup operations', () => {
+    it('removes timers and event handlers', () => {
+      const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout');
+
+      rootState.after(1000, vi.fn());
+
+      rootState.cleanup();
+
+      expect(clearTimeoutSpy).toHaveBeenCalled();
+    });
+  });
+
+  describe('error handling', () => {
+    it('throws when adding duplicate child state IDs', () => {
+      const child1 = new StateNode<TestEvent, TestContext>({ id: 'duplicate' });
+      const child2 = new StateNode<TestEvent, TestContext>({ id: 'duplicate' });
+
+      rootState.addChildState(child1);
+      expect(() => rootState.addChildState(child2)).toThrow();
+    });
+
+    it('throws when transitioning to non-existent state', () => {
+      const child2 = rootState
+        .appendChild({ id: 'child' })
+        .appendChild({ id: 'child2' });
+
+      expect(async () => child2.transition('nonexistent')).rejects.toThrow();
+    });
+  });
+});

@@ -19,6 +19,7 @@ function invariant(
 ): asserts condition {
   if (condition === false || condition === null || condition === undefined) {
     const errorMessage = typeof message === 'function' ? message() : message;
+
     throw new InvariantError(errorMessage);
   }
 }

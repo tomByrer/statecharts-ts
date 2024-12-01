@@ -6,14 +6,14 @@
  * @param message - The error message to throw if the condition is falsy.
  * @throws {InvariantError} When the condition is falsy
  */
-class InvariantError extends Error {
+export class InvariantError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'InvariantError';
   }
 }
 
-function invariant(
+export function invariant(
   condition: unknown,
   message: string | (() => string),
 ): asserts condition {
@@ -23,5 +23,3 @@ function invariant(
     throw new InvariantError(errorMessage);
   }
 }
-
-export { invariant, InvariantError };

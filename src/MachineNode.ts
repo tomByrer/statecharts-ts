@@ -1,4 +1,4 @@
-import { invariant } from './lib';
+import { invariant } from './lib/invariant';
 
 export type SerialisedState<S = string> =
   | S
@@ -399,7 +399,7 @@ export class MachineNode<E extends MachineEvent, C = unknown> {
 
       if (stateId) {
         // Transition to the new state
-        this.transition(stateId as string);
+        this.transition(stateId);
       }
     }, ms);
 

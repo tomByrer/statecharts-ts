@@ -1,4 +1,4 @@
-import { MachineEvent } from './StateNode';
+import { MachineEvent } from './MachineNode';
 
 export class EventBusError extends Error {
   constructor(message: string) {

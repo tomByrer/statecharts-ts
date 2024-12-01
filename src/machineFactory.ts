@@ -3,8 +3,8 @@ import {
   EventHandler,
   ExitHandler,
   MachineEvent,
-  StateNode,
-} from './StateNode';
+  MachineNode,
+} from './MachineNode';
 
 /**
  * Configuration for a state in the state machine.
@@ -67,7 +67,7 @@ export type NodeConfig<E extends MachineEvent, C = unknown> = {
 
 export type StateRegistry<E extends MachineEvent, C = unknown> = Map<
   string,
-  StateNode<E, C>
+  MachineNode<E, C>
 >;
 
 type ContextOrFn<C> = C | ((context: C) => C);
@@ -113,5 +113,5 @@ export type RootConfig<E extends MachineEvent, C = unknown> = {
 export function machineFactory<E extends MachineEvent, C>(
   config: RootConfig<E, C>,
 ) {
-  return new StateNode<E, C>({ id: 'root', ...config });
+  return new MachineNode<E, C>({ id: 'root', ...config });
 }

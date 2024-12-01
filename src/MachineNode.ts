@@ -1,5 +1,3 @@
-// State.ts
-
 import { invariant } from './lib';
 
 export type SerialisedState<S = string> =
@@ -95,10 +93,10 @@ type StateNodeOptions<E extends MachineEvent, C = unknown> = {
   };
 };
 
-export class StateNode<E extends MachineEvent, C = unknown> {
+export class MachineNode<E extends MachineEvent, C = unknown> {
   #context?: C;
-  #children: StateNode<E, C>[] = [];
-  #parentStateNode?: StateNode<E, C>;
+  #children: MachineNode<E, C>[] = [];
+  #parentStateNode?: MachineNode<E, C>;
   #timers: ReturnType<typeof setTimeout>[] = [];
   #handlers: Partial<{
     [K in E['type']]: EventHandler<Extract<E, { type: K }>, C>;
@@ -150,7 +148,7 @@ export class StateNode<E extends MachineEvent, C = unknown> {
     }
   }
 
-  addChildState(child: StateNode<E, C>, initial?: boolean) {
+  addChildState(child: MachineNode<E, C>, initial?: boolean) {
     if (this.#children.some((c) => c.id === child.id)) {
       throw new StateRegistryError(
         `Child state with ID ${child.id} already exists`,
@@ -173,7 +171,7 @@ export class StateNode<E extends MachineEvent, C = unknown> {
    * @param child - The child state to remove.
    * @returns The current state node.
    */
-  removeChildState(child: StateNode<E, C>) {
+  removeChildState(child: MachineNode<E, C>) {
     child.#parentStateNode = undefined;
 
     this.#children = this.#children.filter((c) => c !== child);
@@ -200,7 +198,7 @@ export class StateNode<E extends MachineEvent, C = unknown> {
     };
     initial?: boolean;
   }) {
-    const child = new StateNode<E, C>({
+    const child = new MachineNode<E, C>({
       id: params.id,
       context: this.#context,
       onEntry: params.onEntry,
@@ -263,7 +261,7 @@ export class StateNode<E extends MachineEvent, C = unknown> {
   async transition(targetId: string) {
     // Find target state by searching up through ancestors
     let targetState = this.getStateById(targetId, this);
-    let commonAncestor: StateNode<E, C> | undefined = this.#parentStateNode;
+    let commonAncestor: MachineNode<E, C> | undefined = this.#parentStateNode;
 
     if (!targetState) {
       while (commonAncestor) {
@@ -281,8 +279,8 @@ export class StateNode<E extends MachineEvent, C = unknown> {
     invariant(commonAncestor, 'Common ancestor not found');
 
     // Exit states from current up to common ancestor
-    let currentState: StateNode<E, C> = this; // eslint-disable-line @typescript-eslint/no-this-alias
-    const statesToEnter: StateNode<E, C>[] = [];
+    let currentState: MachineNode<E, C> = this; // eslint-disable-line @typescript-eslint/no-this-alias
+    const statesToEnter: MachineNode<E, C>[] = [];
 
     // Find path to common ancestor while exiting states
     while (currentState !== commonAncestor) {
@@ -423,7 +421,7 @@ export class StateNode<E extends MachineEvent, C = unknown> {
    *
    * @returns The active children of the current state node
    */
-  getActiveChildren(): StateNode<E, C>[] {
+  getActiveChildren(): MachineNode<E, C>[] {
     return this.getChildren().filter((child) => child.active);
   }
 
@@ -440,7 +438,7 @@ export class StateNode<E extends MachineEvent, C = unknown> {
    */
   getStateById(
     id: string,
-    current: StateNode<E, C> = this,
+    current: MachineNode<E, C> = this,
     excludeId?: string,
   ) {
     // Return early if we've found the excluded ID
@@ -454,7 +452,7 @@ export class StateNode<E extends MachineEvent, C = unknown> {
     }
 
     // Initialize queue with current node's children
-    const queue: StateNode<E, C>[] = [...current.#children];
+    const queue: MachineNode<E, C>[] = [...current.#children];
 
     // Perform breadth-first search
     while (queue.length > 0) {

@@ -1,4 +1,3 @@
-// enforce-const-cast.ts
 import { TSESLint, TSESTree } from '@typescript-eslint/utils';
 
 const rule: TSESLint.RuleModule<'castAsConst', []> = {

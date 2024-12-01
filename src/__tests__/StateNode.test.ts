@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { StateNode, type MachineEvent } from '../StateNode';
+import { MachineNode, type MachineEvent } from '../MachineNode';
 
 interface TestContext {
   count: number;
@@ -7,11 +7,11 @@ interface TestContext {
 
 type TestEvent = MachineEvent<{ value?: number }>;
 
-describe('StateNode', () => {
-  let rootState: StateNode<TestEvent, TestContext>;
+describe('MachineNode', () => {
+  let rootState: MachineNode<TestEvent, TestContext>;
 
   beforeEach(() => {
-    rootState = new StateNode<TestEvent, TestContext>({
+    rootState = new MachineNode<TestEvent, TestContext>({
       id: 'root',
       context: { count: 0 },
     });
@@ -38,7 +38,7 @@ describe('StateNode', () => {
       const onEntry = vi.fn();
       const onExit = vi.fn();
 
-      const rootState = new StateNode<TestEvent, TestContext>({
+      const rootState = new MachineNode<TestEvent, TestContext>({
         id: 'root',
         onEntry,
         onExit,
@@ -51,14 +51,18 @@ describe('StateNode', () => {
 
   describe('child state management', () => {
     it('adds child states to parent', () => {
-      const childState = new StateNode<TestEvent, TestContext>({ id: 'child' });
+      const childState = new MachineNode<TestEvent, TestContext>({
+        id: 'child',
+      });
       const result = rootState.addChildState(childState);
       expect(result).toBe(rootState);
       expect(rootState.getChildren()).toContain(childState);
     });
 
     it('marks child state as initial state', () => {
-      const childState = new StateNode<TestEvent, TestContext>({ id: 'child' });
+      const childState = new MachineNode<TestEvent, TestContext>({
+        id: 'child',
+      });
       const result = rootState.addChildState(childState, true);
       expect(result).toBe(rootState);
       expect(rootState.initialChildId).toBe(childState.id);
@@ -67,14 +71,18 @@ describe('StateNode', () => {
 
   describe('child state removal', () => {
     it('removes child state from parent', () => {
-      const childState = new StateNode<TestEvent, TestContext>({ id: 'child' });
+      const childState = new MachineNode<TestEvent, TestContext>({
+        id: 'child',
+      });
       rootState.addChildState(childState);
       rootState.removeChildState(childState);
       expect(rootState.getChildren()).not.toContain(childState);
     });
 
     it('clears initial state when removed', () => {
-      const childState = new StateNode<TestEvent, TestContext>({ id: 'child' });
+      const childState = new MachineNode<TestEvent, TestContext>({
+        id: 'child',
+      });
       rootState.addChildState(childState, true);
       rootState.removeChildState(childState);
       expect(rootState.initialChildId).toBeUndefined();
@@ -105,7 +113,9 @@ describe('StateNode', () => {
     });
 
     it('propagates context changes to child states', () => {
-      const childState = new StateNode<TestEvent, TestContext>({ id: 'child' });
+      const childState = new MachineNode<TestEvent, TestContext>({
+        id: 'child',
+      });
       rootState.addChildState(childState);
       rootState.setContext({ count: 1 });
       expect(childState.getContext()).toEqual({ count: 1 });
@@ -115,7 +125,7 @@ describe('StateNode', () => {
   describe('event handling', () => {
     it('dispatches events to handlers when active', () => {
       const handler = vi.fn();
-      const rootState = new StateNode<TestEvent, TestContext>({
+      const rootState = new MachineNode<TestEvent, TestContext>({
         id: 'root',
         on: {
           TEST: handler,
@@ -128,7 +138,7 @@ describe('StateNode', () => {
 
     it('does not dispatch events to handlers when inactive', () => {
       const handler = vi.fn();
-      const rootState = new StateNode<TestEvent, TestContext>({
+      const rootState = new MachineNode<TestEvent, TestContext>({
         id: 'root',
         on: {
           TEST: handler,
@@ -140,7 +150,7 @@ describe('StateNode', () => {
 
     it('propagates events to child states', () => {
       const eventHandler = vi.fn();
-      const childState = new StateNode<TestEvent, TestContext>({
+      const childState = new MachineNode<TestEvent, TestContext>({
         id: 'child',
         on: {
           TEST: eventHandler,
@@ -155,12 +165,12 @@ describe('StateNode', () => {
 
   describe('state transitions', () => {
     describe('transitions initial child state on parent entry', async () => {
-      const childState1 = new StateNode<TestEvent, TestContext>({
+      const childState1 = new MachineNode<TestEvent, TestContext>({
         id: 'child1',
         onEntry: vi.fn(),
         onExit: vi.fn(),
       });
-      const childState2 = new StateNode<TestEvent, TestContext>({
+      const childState2 = new MachineNode<TestEvent, TestContext>({
         id: 'child2',
         onEntry: vi.fn(),
         onExit: vi.fn(),
@@ -204,23 +214,23 @@ describe('StateNode', () => {
     });
 
     describe('parallel states', () => {
-      let rootState: StateNode<TestEvent, TestContext>;
-      let child1: StateNode<TestEvent, TestContext>;
-      let child2: StateNode<TestEvent, TestContext>;
+      let rootState: MachineNode<TestEvent, TestContext>;
+      let child1: MachineNode<TestEvent, TestContext>;
+      let child2: MachineNode<TestEvent, TestContext>;
 
       beforeEach(() => {
-        rootState = new StateNode<TestEvent, TestContext>({
+        rootState = new MachineNode<TestEvent, TestContext>({
           id: 'root',
           parallel: true,
         });
 
-        child1 = new StateNode<TestEvent, TestContext>({
+        child1 = new MachineNode<TestEvent, TestContext>({
           id: 'child1',
           onEntry: vi.fn(),
           onExit: vi.fn(),
         });
 
-        child2 = new StateNode<TestEvent, TestContext>({
+        child2 = new MachineNode<TestEvent, TestContext>({
           id: 'child2',
           onEntry: vi.fn(),
           onExit: vi.fn(),
@@ -278,8 +288,12 @@ describe('StateNode', () => {
 
   describe('error handling', () => {
     it('throws when adding duplicate child state IDs', () => {
-      const child1 = new StateNode<TestEvent, TestContext>({ id: 'duplicate' });
-      const child2 = new StateNode<TestEvent, TestContext>({ id: 'duplicate' });
+      const child1 = new MachineNode<TestEvent, TestContext>({
+        id: 'duplicate',
+      });
+      const child2 = new MachineNode<TestEvent, TestContext>({
+        id: 'duplicate',
+      });
 
       rootState.addChildState(child1);
       expect(() => rootState.addChildState(child2)).toThrow();

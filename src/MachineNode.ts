@@ -82,7 +82,7 @@ export class StateRegistryError extends Error {
   }
 }
 
-type StateNodeOptions<E extends MachineEvent, C = unknown> = {
+export type StateNodeOptions<E extends MachineEvent, C = unknown> = {
   id: string;
   parallel?: boolean;
   context?: C;
@@ -93,7 +93,7 @@ type StateNodeOptions<E extends MachineEvent, C = unknown> = {
   };
 };
 
-export class MachineNode<E extends MachineEvent, C = unknown> {
+export class MachineNode<E extends MachineEvent, C extends object> {
   #context?: C;
   #children: MachineNode<E, C>[] = [];
   #parentStateNode?: MachineNode<E, C>;

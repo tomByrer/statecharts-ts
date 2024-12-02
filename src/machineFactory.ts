@@ -65,24 +65,23 @@ export type NodeConfig<E extends MachineEvent, C = unknown> = {
   onExit?: ExitHandler<C>;
 };
 
-export type StateRegistry<E extends MachineEvent, C = unknown> = Map<
-  string,
-  MachineNode<E, C>
->;
-
+/**
+ * Context or function that returns a context
+ */
 type ContextOrFn<C> = C | ((context: C) => C);
 
+/**
+ * Context object passed to the state machine
+ */
 export type MachineContext<E extends MachineEvent, C = unknown> = {
-  stateRegistry: StateRegistry<E, C>;
   notifyHandlers: (event?: E) => void;
   context: C;
   setContext: (context: ContextOrFn<C>) => C;
 };
 
-export type SerialisedState<S = string> =
-  | S
-  | { [K in string]: SerialisedState<S> };
-
+/**
+ * Coerces the node config to the expected type
+ */
 type CoerceNodeConfig<T extends NodeConfig<MachineEvent, unknown>> = {
   initial: keyof T['states'];
   states: {
@@ -95,10 +94,16 @@ type CoerceNodeConfig<T extends NodeConfig<MachineEvent, unknown>> = {
   };
 };
 
+/**
+ * Validates the node config
+ */
 type ValidateNodeConfig<T extends NodeConfig<MachineEvent, unknown> | object> =
   T extends never ? T : CoerceNodeConfig<T>;
 
-export type RootConfig<E extends MachineEvent, C = unknown> = {
+/**
+ * The configuration object for the state machine
+ */
+export type MachineFactoryConfig<E extends MachineEvent, C = unknown> = {
   context: C;
   events: E;
 } & ValidateNodeConfig<NodeConfig<E, C>>;
@@ -111,7 +116,7 @@ export type RootConfig<E extends MachineEvent, C = unknown> = {
  * @returns A new state machine.
  */
 export function machineFactory<E extends MachineEvent, C>(
-  config: RootConfig<E, C>,
+  config: MachineFactoryConfig<E, C>,
 ) {
   return new MachineNode<E, C>({ id: 'root', ...config });
 }

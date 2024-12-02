@@ -101,14 +101,6 @@ type ValidateNodeConfig<T extends NodeConfig<MachineEvent, unknown> | object> =
   T extends never ? T : CoerceNodeConfig<T>;
 
 /**
- * The configuration object for the state machine
- */
-export type MachineFactoryConfig<E extends MachineEvent, C = unknown> = {
-  context: C;
-  events: E;
-} & ValidateNodeConfig<NodeConfig<E, C>>;
-
-/**
  * Factory function for creating type-safe state machines
  * This the expected way to create a state machine, rather than instantiating a StateMachine directly.
  *
@@ -116,7 +108,7 @@ export type MachineFactoryConfig<E extends MachineEvent, C = unknown> = {
  * @returns A new state machine.
  */
 export function machineFactory<E extends MachineEvent, C>(
-  config: MachineFactoryConfig<E, C>,
+  config: ValidateNodeConfig<NodeConfig<E, C>>,
 ) {
   return new MachineNode<E, C>({ id: 'root', ...config });
 }

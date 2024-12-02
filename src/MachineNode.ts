@@ -105,7 +105,7 @@ export class MachineNode<E extends MachineEvent, C extends object> {
   #initialChildId?: string;
   #history?: 'shallow' | 'deep';
   #parallel = false;
-  readonly #id: string;
+  #id: string;
 
   onEntry?: EntryHandler<C>;
   onExit?: ExitHandler<C>;

@@ -72,7 +72,7 @@ const machine = machineFactory({
       }
     },
   },
-} as const);
+});
 
 machine.subscribe((state) => {
   console.log('State:', state);
@@ -93,6 +93,7 @@ process.stdin.on('data', (key: Buffer) => {
 
   // space key
   if (key.toString() === ' ') {
+    console.log('Dispatching STOP event');
     machine.dispatch({ type: 'STOP' });
   }
 });

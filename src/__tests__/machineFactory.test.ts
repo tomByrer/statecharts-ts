@@ -10,20 +10,18 @@ interface TestEvent extends MachineEvent {
 describe('machineFactory', () => {
   it('should create a state machine with the given configuration', () => {
     const machine = machineFactory({
-      context: { count: 0 },
       events: { type: 'START' } as TestEvent,
+      context: { count: 0 },
       initial: 'idle',
       states: {
         idle: {
           on: {
-            START: {
-              target: 'running',
-            },
+            START: () => 'running',
           },
         },
         running: {
           on: {
-            STOP: 'idle',
+            STOP: () => 'idle',
           },
         },
       },
@@ -41,21 +39,21 @@ describe('machineFactory', () => {
       states: {
         idle: {
           on: {
-            START: 'running',
+            START: () => 'running',
           },
         },
         running: {
           on: {
-            STOP: 'idle',
+            STOP: () => 'idle',
           },
         },
       },
     });
 
-    machine.transition({ type: 'START' });
+    machine.dispatch({ type: 'START' });
     expect(machine.value).toBe('running');
 
-    machine.transition({ type: 'STOP' });
+    machine.dispatch({ type: 'STOP' });
     expect(machine.value).toBe('idle');
   });
 });

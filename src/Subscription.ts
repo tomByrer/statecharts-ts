@@ -10,7 +10,9 @@ export class Subscription {
    * Creates a new Subscription instance
    * @param unsubscribe - Function that will be called to remove a handler when unsubscribing
    */
-  constructor() {}
+  constructor() {
+    this.#handlers = [];
+  }
 
   /**
    * Subscribes a handler function to receive state updates
@@ -28,5 +30,12 @@ export class Subscription {
    */
   unsubscribe(handler: (state: string) => void) {
     this.#handlers = this.#handlers.filter((h) => h !== handler);
+  }
+
+  /**
+   * Clears all handlers from the subscription
+   */
+  clear() {
+    this.#handlers = [];
   }
 }

@@ -1,7 +1,7 @@
-import { MachineEvent, MachineNode, StateNodeOptions } from './MachineNode';
-import { Subscription } from './Subscription';
+import { Machine } from './Machine';
+import { EventHandler, MachineEvent, StateNodeOptions } from './MachineNode';
 
-type StateConfigNode<E extends MachineEvent, C extends object> = {
+export type StateConfigNode<E extends MachineEvent, C extends object> = {
   states: Record<string, Partial<StateConfigNode<E, C>>>;
 } & StateNodeOptions<E, C>;
 
@@ -11,6 +11,7 @@ type CoerceStateNode<
   T extends StateConfigNode<E, C>,
 > = {
   initial: keyof T['states'];
+  on?: Record<E['type'], EventHandler<E, C>>;
   states: {
     [K in keyof T['states']]: T['states'][K] extends StateConfigNode<E, C>
       ? CoerceStateNode<E, C, T['states'][K]>
@@ -18,7 +19,7 @@ type CoerceStateNode<
   };
 };
 
-type ValidateStateNode<
+export type ValidateStateNode<
   E extends MachineEvent,
   C extends object,
   T extends StateConfigNode<E, C>,
@@ -27,23 +28,10 @@ type ValidateStateNode<
 export function machineFactory<E extends MachineEvent, C extends object>(
   config: ValidateStateNode<E, C, StateConfigNode<E, C>> & {
     events: E;
+    context?: C;
   },
 ) {
-  const subscription = new Subscription();
-  const { subscribe } = subscription;
+  const machine = new Machine<E, C>(config);
 
-  const {
-    active,
-    dispatch,
-    enter: start,
-    exit: stop,
-  } = new MachineNode<E, C>({ id: 'root', ...config });
-
-  return {
-    active,
-    dispatch,
-    start,
-    stop,
-    subscribe,
-  };
+  return machine;
 }

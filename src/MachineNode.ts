@@ -82,7 +82,7 @@ export class StateRegistryError extends Error {
   }
 }
 
-export type StateNodeOptions<E extends MachineEvent, C = unknown> = {
+export type StateNodeOptions<E extends MachineEvent, C = object> = {
   id: string;
   parallel?: boolean;
   context?: C;
@@ -307,6 +307,22 @@ export class MachineNode<E extends MachineEvent, C extends object> {
     }
   }
 
+  getActiveChildren() {
+    return this.#children.filter((child) => child.active);
+  }
+
+  serialiseState(): SerialisedState {
+    const activeChildren = this.getActiveChildren();
+
+    if (activeChildren.length === 0) {
+      return this.id;
+    }
+
+    return Object.fromEntries(
+      activeChildren.map((child, index) => [index, child.serialiseState()]),
+    );
+  }
+
   async enter() {
     console.log('Entering state', this.id);
     // Set the state as active
@@ -407,24 +423,6 @@ export class MachineNode<E extends MachineEvent, C extends object> {
     this.#timers.push(timer);
   }
 
-  /**
-   * Returns all children of the current state node
-   *
-   * @returns The children of the current state node
-   */
-  getChildren() {
-    return this.#children;
-  }
-
-  /**
-   * Returns all active children of the current state node
-   *
-   * @returns The active children of the current state node
-   */
-  getActiveChildren(): MachineNode<E, C>[] {
-    return this.getChildren().filter((child) => child.active);
-  }
-
   /*
    * Searches for and returns a StateNode with the given ID in the state tree
    * Performs a breadth-first search starting from the current node
@@ -473,6 +471,10 @@ export class MachineNode<E extends MachineEvent, C extends object> {
     }
   }
 
+  getChildById(id: string) {
+    return this.#children.find((child) => child.id === id);
+  }
+
   cleanup() {
     // Clear all timers
     this.#timers.forEach(clearTimeout);
@@ -503,25 +505,23 @@ export class MachineNode<E extends MachineEvent, C extends object> {
     this.setContext(callback(this.getContext()));
   }
 
-  /**
-   * Serialises the state of the state machine into a serialised state object.
-   *
-   * @param state - The state to serialise.
-   * @returns The serialised state.
-   */
-  serialiseState(state = this): SerialisedState<string> {
-    const activeChildren = state.getActiveChildren();
+  matches(path: string): boolean {
+    // Split path into segments and keep original order
+    const segments = path.split('.');
 
-    if (activeChildren.length === 1) {
-      return activeChildren[0].id as unknown as string;
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    let currentState: MachineNode<E, C> | undefined = this;
+
+    // Traverse down the path
+    for (const segment of segments) {
+      currentState = currentState.getChildById(segment);
+
+      invariant(
+        currentState,
+        `State with ID "${segment}" not found in "${path}"`,
+      );
     }
 
-    return state.getActiveChildren().reduce(
-      (acc, state) => {
-        acc[state.id as string] = state.serialiseState();
-        return acc;
-      },
-      {} as Record<string, SerialisedState<string>>,
-    );
+    return currentState.active;
   }
 }

@@ -7,6 +7,11 @@ export class EventBusError extends Error {
   }
 }
 
+/**
+ * A custom error class for EventBus-related errors.
+ * Used to distinguish errors that occur during event handling and validation
+ * from other types of errors in the system.
+ */
 export class EventBus<E extends MachineEvent, T = string> {
   private subscriptions: Map<T | '*', Set<(event: E) => void>>;
 

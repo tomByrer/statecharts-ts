@@ -1,5 +1,3 @@
-import { machineFactory } from '../index';
-
 /*
   Traffic light state machine
 
@@ -26,6 +24,8 @@ import { machineFactory } from '../index';
     - After a readyStopPeriod, the system transitions back to the stop state.
  */
 
+import { machineFactory } from '../src/machineFactory';
+
 const timeouts = {
   stop: 3_000,
   readyGo: 3_000,
@@ -36,6 +36,7 @@ let waiting = false;
 
 const machine = machineFactory({
   events: {} as { type: 'STOP' },
+  initial: 'readyGo',
   states: {
     stop: {
       onEntry: ({ after }) => {
@@ -43,7 +44,6 @@ const machine = machineFactory({
       },
     },
     readyGo: {
-      initial: true,
       onEntry: ({ after }) => {
         after(timeouts.readyGo, () => 'go');
       },
@@ -93,7 +93,7 @@ process.stdin.on('data', (key: Buffer) => {
 
   // space key
   if (key.toString() === ' ') {
-    machine.send({ type: 'STOP' });
+    machine.dispatch({ type: 'STOP' });
   }
 });
 

@@ -16,7 +16,9 @@ describe('machineFactory', () => {
       states: {
         idle: {
           on: {
-            START: 'running',
+            START: {
+              target: 'running',
+            },
           },
         },
         running: {

@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { machineFactory } from '../machineFactory';
+import { machineFactory } from '../src/machineFactory';
 
 const context = {
   currentTrack: {

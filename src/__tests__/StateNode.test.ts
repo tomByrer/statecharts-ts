@@ -56,7 +56,7 @@ describe('MachineNode', () => {
       });
       const result = rootState.addChildState(childState);
       expect(result).toBe(rootState);
-      expect(rootState.getChildren()).toContain(childState);
+      expect(rootState.children).toContain(childState);
     });
 
     it('marks child state as initial state', () => {
@@ -76,7 +76,7 @@ describe('MachineNode', () => {
       });
       rootState.addChildState(childState);
       rootState.removeChildState(childState);
-      expect(rootState.getChildren()).not.toContain(childState);
+      expect(rootState.children).not.toContain(childState);
     });
 
     it('clears initial state when removed', () => {
@@ -92,7 +92,7 @@ describe('MachineNode', () => {
   describe('child state creation', () => {
     it('creates and appends new child state', () => {
       const result = rootState.appendChild({ id: 'child' });
-      expect(rootState.getChildren()).toContain(result);
+      expect(rootState.children).toContain(result);
     });
 
     it('marks newly created child as initial state', () => {
@@ -271,6 +271,26 @@ describe('MachineNode', () => {
       expect(transition).toHaveBeenCalledWith('next');
 
       vi.useRealTimers();
+    });
+
+    it('transitions to sibling after delay', async () => {
+      vi.useFakeTimers();
+
+      const child1 = rootState.appendChild({
+        id: 'child1',
+        onEntry: ({ after }) => {
+          after(1000, () => 'child2');
+        },
+      });
+      const child2 = rootState.appendChild({ id: 'child2' });
+
+      vi.advanceTimersByTime(1000);
+      rootState.enter();
+
+      await vi.runAllTimersAsync();
+
+      expect(child1.active).toBe(false);
+      expect(child2.active).toBe(true);
     });
   });
 

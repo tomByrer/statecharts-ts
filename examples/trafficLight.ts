@@ -1,82 +1,58 @@
-/*
-  Traffic light state machine
+import { MachineNode } from '../src/MachineNode';
 
-  This state machine simulates a traffic light system with four states: stop, readyGo, go, and readyStop.
-  Each state represents a different phase of the traffic light cycle, controlling both vehicle and pedestrian signals.
-
-  - stop: 
-    - Traffic lights are red, and pedestrian lights are green, allowing pedestrians to cross.
-    - The system remains in this state for a specified stopPeriod before transitioning to readyGo.
-
-  - readyGo:
-    - Traffic lights show red and amber, preparing vehicles to move.
-    - Pedestrian lights remain green, but pedestrians should not start crossing.
-    - After a readyGoPeriod, the system transitions to the go state.
-
-  - go:
-    - Traffic lights turn green, allowing vehicles to move.
-    - Pedestrian lights are red, stopping pedestrian crossing.
-    - The system can transition to the stop state upon receiving a 'stop' event, with pedestrians being warned to wait.
-
-  - readyStop:
-    - Traffic lights show amber, preparing vehicles to stop.
-    - Pedestrian lights remain red.
-    - After a readyStopPeriod, the system transitions back to the stop state.
- */
-
-import { machineFactory } from '../src/machineFactory';
-
-const timeouts = {
-  stop: 3_000,
-  readyGo: 3_000,
-  readyStop: 3_000,
-};
-
-let waiting = false;
-
-const machine = machineFactory({
-  events: {} as { type: 'STOP' },
-  initial: 'readyGo',
-  states: {
-    stop: {
-      onEntry: ({ after }) => {
-        after(timeouts.stop, () => 'readyGo');
-      },
-    },
-    readyGo: {
-      onEntry: ({ after }) => {
-        after(timeouts.readyGo, () => 'go');
-      },
-    },
-    go: {
-      onEntry: () => {},
-      on: {
-        STOP: () => 'wait',
-      },
-    },
-    wait: {
-      onEntry: ({ after }) => {
-        after(timeouts.readyStop, () => 'stop');
-      },
-    },
-    readyStop: {
-      onEntry: ({ after }) => {
-        after(timeouts.readyStop, () => 'stop');
-      },
+const machine = new MachineNode({
+  events: { type: 'STOP' } as const,
+  id: 'machine',
+  context: {
+    waiting: false as boolean,
+    timeouts: {
+      stop: 3_000,
+      readyGo: 3_000,
+      go: 3_000,
+      readyStop: 3_000,
     },
   },
   on: {
-    STOP: () => {
-      if (!waiting) {
-        waiting = true;
+    STOP: ({ context, updateContext }) => {
+      if (!context.waiting) {
+        updateContext((c) => ({ ...c, waiting: true }));
       }
     },
   },
 });
 
-machine.subscribe((state) => {
-  console.log('State:', state);
+machine.appendChild({
+  id: 'stop',
+  onEntry: ({ after, context }) => {
+    after(context.timeouts.stop, () => 'readyGo');
+  },
 });
+
+machine.appendChild({
+  id: 'readyGo',
+  initial: true,
+  onEntry: ({ after, context }) => {
+    after(context.timeouts.readyGo, () => 'go');
+  },
+});
+
+machine.appendChild({
+  id: 'go',
+  onEntry: ({ after, context }) => {
+    after(context.timeouts.go, () => 'readyStop');
+  },
+});
+
+machine.appendChild({
+  id: 'readyStop',
+  onEntry: ({ after, context }) => {
+    after(context.timeouts.readyStop, () => 'stop');
+  },
+});
+
+machine.onTransition = (state) => {
+  console.log('State:', state);
+};
 
 // Add keyboard input handling
 process.stdin.setRawMode(true);
@@ -87,13 +63,12 @@ process.stdin.on('data', (key: Buffer) => {
   // ctrl+c
   if (key.toString() === '\u0003') {
     console.log('Exiting...');
-    machine.stop();
+    machine.exit();
     process.exit(0);
   }
 
   // space key
   if (key.toString() === ' ') {
-    console.log('Dispatching STOP event');
     machine.dispatch({ type: 'STOP' });
   }
 });
@@ -101,4 +76,4 @@ process.stdin.on('data', (key: Buffer) => {
 console.clear();
 console.log('Press SPACE to trigger stop, ctrl+C to exit\n');
 
-machine.start();
+machine.enter();

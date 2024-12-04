@@ -82,8 +82,9 @@ export class StateRegistryError extends Error {
   }
 }
 
-export type StateNodeOptions<E extends MachineEvent, C = object> = {
+export type StateNodeOptions<E extends MachineEvent, C extends object> = {
   id: string;
+  events?: E;
   parallel?: boolean;
   context?: C;
   onEntry?: EntryHandler<C>;
@@ -129,6 +130,10 @@ export class MachineNode<E extends MachineEvent, C extends object> {
 
   set initialChildId(value: string | undefined) {
     this.#initialChildId = value;
+  }
+
+  get children(): MachineNode<E, C>[] {
+    return this.#children;
   }
 
   constructor(options: StateNodeOptions<E, C>) {
@@ -259,51 +264,92 @@ export class MachineNode<E extends MachineEvent, C extends object> {
   }
 
   async transition(targetId: string) {
-    // Find target state by searching up through ancestors
-    let targetState = this.getStateById(targetId, this);
-    let commonAncestor: MachineNode<E, C> | undefined = this.#parentStateNode;
-
-    if (!targetState) {
-      while (commonAncestor) {
-        targetState = commonAncestor.getStateById(targetId);
-
-        if (targetState) {
-          break;
-        }
-
-        commonAncestor = commonAncestor.#parentStateNode;
-      }
-    }
+    // Find target state and common ancestor
+    const targetState =
+      this.getStateById(targetId, this) ||
+      this.findTargetStateInAncestors(targetId);
 
     invariant(targetState, `State with ID ${targetId} not found`);
+    invariant(targetState.#parentStateNode, 'Target state has no parent');
+
+    const commonAncestor = this.findCommonAncestor(targetState);
     invariant(commonAncestor, 'Common ancestor not found');
 
-    // Exit states from current up to common ancestor
-    let currentState: MachineNode<E, C> = this; // eslint-disable-line @typescript-eslint/no-this-alias
-    const statesToEnter: MachineNode<E, C>[] = [];
+    // Exit current state branch up to common ancestor and collect states to enter
+    const { statesToEnter } = await this.exitToAncestor(commonAncestor);
 
-    // Find path to common ancestor while exiting states
-    while (currentState !== commonAncestor) {
-      currentState.exit();
+    // Enter collected states in reverse order
+    await Promise.all(
+      statesToEnter
+        .slice(1)
+        .reverse()
+        .map((state) => state.enter()),
+    );
+
+    // Enter target state
+    await targetState.enter();
+
+    // Notify ancestors of transition
+    this.notifyAncestorsOfTransition(targetState);
+  }
+
+  private findTargetStateInAncestors(targetId: string) {
+    let ancestor = this.#parentStateNode;
+    while (ancestor) {
+      const found = ancestor.getStateById(targetId);
+      if (found) return found;
+      ancestor = ancestor.#parentStateNode;
+    }
+    return undefined;
+  }
+
+  private findCommonAncestor(targetState: MachineNode<E, C>) {
+    let ancestor = this.#parentStateNode;
+    while (ancestor) {
+      if (this.isAncestorOf(ancestor, targetState)) {
+        return ancestor;
+      }
+      ancestor = ancestor.#parentStateNode;
+    }
+    return undefined;
+  }
+
+  private isAncestorOf(
+    ancestor: MachineNode<E, C>,
+    node: MachineNode<E, C>,
+  ): boolean {
+    let current = node;
+    while (current.#parentStateNode) {
+      if (current.#parentStateNode === ancestor) return true;
+      current = current.#parentStateNode;
+    }
+    return false;
+  }
+
+  private async exitToAncestor(ancestor: MachineNode<E, C>) {
+    const statesToEnter: MachineNode<E, C>[] = [];
+    let currentState: MachineNode<E, C> = this; // eslint-disable-line @typescript-eslint/no-this-alias
+
+    while (currentState !== ancestor) {
+      await currentState.exit();
       currentState = currentState.#parentStateNode!;
+      invariant(currentState, 'Current state not found');
       statesToEnter.push(currentState);
     }
 
-    // Enter states from common ancestor to target
-    statesToEnter.reverse().forEach((state) => state.enter());
+    return { statesToEnter };
+  }
 
-    // Finally enter target state
-    await targetState.enter();
+  private notifyAncestorsOfTransition(targetState: MachineNode<E, C>) {
+    const context = this.getContext();
+    let currentState = targetState.#parentStateNode;
 
-    for (
-      let currentState = targetState.#parentStateNode;
-      currentState;
-      currentState = currentState.#parentStateNode!
-    ) {
+    while (currentState) {
       currentState.onTransition?.({
         state: currentState.serialiseState(),
-        context: this.getContext(),
+        context,
       });
+      currentState = currentState.#parentStateNode!;
     }
   }
 

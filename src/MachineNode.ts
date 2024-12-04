@@ -15,6 +15,25 @@ export type MachineEvent<D = unknown> = {
 };
 
 /**
+ * A function that updates the context.
+ *
+ * @template C - The type of context.
+ * @param callback - A function that takes the current context and returns the new context.
+ */
+type UpdateContext<C> = (callback: (context: C) => C) => void;
+
+/**
+ * A function that sets a specific property of the context.
+ *
+ * @template C - The type of context.
+ * @param key - A key of the context.
+ * @param value - The value to set.
+ */
+type SetContext<C> = {
+  <K extends keyof C>(key: K, value: C[K]): void;
+};
+
+/**
  * A callback function that can be scheduled to run after a delay.
  *
  * @template S - The type of state identifier.
@@ -26,8 +45,8 @@ type AfterCallback<C> = ({
   updateContext,
 }: {
   context: C;
-  setContext: (context: C) => void;
-  updateContext: (callback: (context: C) => C) => void;
+  setContext: SetContext<C>;
+  updateContext: UpdateContext<C>;
 }) => Promise<string | void> | string | void;
 
 /**
@@ -39,8 +58,10 @@ type AfterCallback<C> = ({
  * @returns The state identifier or void.
  */
 export type EntryHandler<C> = (params: {
-  after: (ms: number, callback: AfterCallback<C>) => void;
   context: C;
+  setContext: SetContext<C>;
+  updateContext: UpdateContext<C>;
+  after: (ms: number, callback: AfterCallback<C>) => void;
 }) => Promise<string | void> | string | void;
 
 /**
@@ -56,8 +77,10 @@ export type ExitHandler<C> = (params: { context: C }) => Promise<void>;
  * @returns Void.
  */
 export type TransitionHandler<C> = (params: {
-  state: SerialisedState<string>;
   context: C;
+  setContext: SetContext<C>;
+  updateContext: UpdateContext<C>;
+  state: SerialisedState<string>;
 }) => Promise<void> | void;
 
 /**
@@ -71,8 +94,8 @@ export type TransitionHandler<C> = (params: {
 export type EventHandler<E, C> = (params: {
   event: E;
   context: C;
-  setContext: (context: C) => void;
-  updateContext: (callback: (context: C) => C) => void;
+  setContext: SetContext<C>;
+  updateContext: UpdateContext<C>;
 }) => string | void;
 
 export class StateRegistryError extends Error {
@@ -263,6 +286,11 @@ export class MachineNode<E extends MachineEvent, C extends object> {
     }
   }
 
+  /**
+   * Transitions to the target state.
+   *
+   * @param targetId - The ID of the target state.
+   */
   async transition(targetId: string) {
     // Find target state and common ancestor
     const targetState =
@@ -342,21 +370,35 @@ export class MachineNode<E extends MachineEvent, C extends object> {
 
   private notifyAncestorsOfTransition(targetState: MachineNode<E, C>) {
     const context = this.getContext();
+    const setContext = this.setContext.bind(this);
+    const updateContext = this.updateContext.bind(this);
     let currentState = targetState.#parentStateNode;
 
     while (currentState) {
       currentState.onTransition?.({
         state: currentState.serialiseState(),
         context,
+        setContext,
+        updateContext,
       });
       currentState = currentState.#parentStateNode!;
     }
   }
 
+  /**
+   * Returns the active children of the current state.
+   *
+   * @returns The active children of the current state.
+   */
   getActiveChildren() {
     return this.#children.filter((child) => child.active);
   }
 
+  /**
+   * Serialises the current state.
+   *
+   * @returns The serialised state.
+   */
   serialiseState(): SerialisedState {
     const activeChildren = this.getActiveChildren();
 
@@ -369,6 +411,9 @@ export class MachineNode<E extends MachineEvent, C extends object> {
     );
   }
 
+  /**
+   * Enters the current state.
+   */
   async enter() {
     console.log('Entering state', this.id);
     // Set the state as active
@@ -377,11 +422,15 @@ export class MachineNode<E extends MachineEvent, C extends object> {
     // Bind the after function to the current state context
     const context = this.getContext();
     const after = this.after.bind(this);
+    const setContext = this.setContext.bind(this);
+    const updateContext = this.updateContext.bind(this);
 
     const entryPromise = Promise.resolve(
       this.onEntry?.({
         after,
         context,
+        setContext,
+        updateContext,
       }),
     ).then((targetId) => {
       if (targetId) {
@@ -419,6 +468,11 @@ export class MachineNode<E extends MachineEvent, C extends object> {
     await Promise.all([entryPromise, ...childEnterPromises]);
   }
 
+  /**
+   * Exits the current state and performs cleanup unless preserving history.
+   *
+   * @param preserveHistory - Whether to preserve history.
+   */
   async exit(preserveHistory?: 'shallow' | 'deep') {
     console.log('Exiting state', this.id);
     // Perform cleanup unless we're preserving history
@@ -448,6 +502,12 @@ export class MachineNode<E extends MachineEvent, C extends object> {
     await Promise.all(promises);
   }
 
+  /**
+   * Schedules a callback to be executed after a specified delay.
+   *
+   * @param ms - The delay in milliseconds.
+   * @param callback - The callback to execute.
+   */
   after(ms: number, callback: AfterCallback<C>) {
     console.log('Scheduling callback', ms, callback);
     // Create a timer that will execute the callback function after the specified delay
@@ -517,10 +577,19 @@ export class MachineNode<E extends MachineEvent, C extends object> {
     }
   }
 
+  /**
+   * Returns the child state with the given ID.
+   *
+   * @param id - The ID of the child state to search for.
+   * @returns The child state with the given ID, or undefined if not found.
+   */
   getChildById(id: string) {
     return this.#children.find((child) => child.id === id);
   }
 
+  /**
+   * Clears all timers and handlers.
+   */
   cleanup() {
     // Clear all timers
     this.#timers.forEach(clearTimeout);
@@ -533,24 +602,52 @@ export class MachineNode<E extends MachineEvent, C extends object> {
     this.#children.forEach((child) => child.cleanup());
   }
 
-  setContext(context: C) {
+  /**
+   * Sets a specific property of the context.
+   *
+   * @param key - A key of the context.
+   * @param value - The value to set.
+   */
+  setContext<K extends keyof C>(key: K, value: C[K]): void {
     if (this.#context !== undefined) {
-      this.#context = context;
+      this.#context = { ...this.#context, [key]: value };
     } else if (this.#parentStateNode) {
-      this.#parentStateNode.setContext(context);
+      this.#parentStateNode.setContext(key, value);
     } else {
       throw new Error('Context not found in current or parent state nodes');
     }
   }
 
+  /**
+   * Returns the context of the current state node.
+   *
+   * @returns The context of the current state node.
+   */
   getContext(): C {
     return this.#context ?? (this.#parentStateNode?.getContext() as C);
   }
 
+  /**
+   * Updates the context by applying a callback function to the current context.
+   *
+   * @param callback - A function that takes the current context and returns the new context.
+   */
   updateContext(callback: (context: C) => C) {
-    this.setContext(callback(this.getContext()));
+    if (this.#context !== undefined) {
+      this.#context = callback(this.#context);
+    } else if (this.#parentStateNode) {
+      this.#parentStateNode.updateContext(callback);
+    } else {
+      throw new Error('Context not found in current or parent state nodes');
+    }
   }
 
+  /**
+   * Checks if the current state matches a given path.
+   *
+   * @param path - The path to check against.
+   * @returns True if the current state matches the path, false otherwise.
+   */
   matches(path: string): boolean {
     // Split path into segments and keep original order
     const segments = path.split('.');

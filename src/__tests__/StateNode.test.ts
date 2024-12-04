@@ -23,14 +23,6 @@ describe('MachineNode', () => {
       expect(rootState.getContext()).toEqual({ count: 0 });
       expect(rootState.active).toBe(false);
     });
-
-    it('updates context through direct setting and updates', () => {
-      rootState.setContext({ count: 1 });
-      expect(rootState.getContext()).toEqual({ count: 1 });
-
-      rootState.updateContext((ctx) => ({ count: ctx.count + 1 }));
-      expect(rootState.getContext()).toEqual({ count: 2 });
-    });
   });
 
   describe('lifecycle hooks', () => {
@@ -102,23 +94,77 @@ describe('MachineNode', () => {
   });
 
   describe('context management', () => {
-    it('updates context directly with setContext', () => {
-      rootState.setContext({ count: 1 });
-      expect(rootState.getContext()).toEqual({ count: 1 });
-    });
-
-    it('updates context through transformation function', () => {
-      rootState.updateContext((ctx) => ({ count: ctx.count + 1 }));
-      expect(rootState.getContext()).toEqual({ count: 1 });
-    });
-
-    it('propagates context changes to child states', () => {
-      const childState = new MachineNode<TestEvent, TestContext>({
-        id: 'child',
+    describe('setting context', () => {
+      it('sets context value directly', () => {
+        rootState.setContext('count', 1);
+        expect(rootState.getContext()).toEqual({ count: 1 });
       });
-      rootState.addChildState(childState);
-      rootState.setContext({ count: 1 });
-      expect(childState.getContext()).toEqual({ count: 1 });
+
+      it('updates existing context value', () => {
+        rootState.setContext('count', 1);
+        rootState.setContext('count', 2);
+        expect(rootState.getContext()).toEqual({ count: 2 });
+      });
+
+      it('propagates context changes to child states', () => {
+        const childState = new MachineNode<TestEvent, TestContext>({
+          id: 'child',
+        });
+        rootState.addChildState(childState);
+        rootState.setContext('count', 1);
+        expect(childState.getContext()).toEqual({ count: 1 });
+      });
+
+      it('throws when context is not found', () => {
+        const orphanState = new MachineNode<TestEvent, TestContext>({
+          id: 'orphan',
+        });
+        expect(() => orphanState.setContext('count', 1)).toThrow(
+          'Context not found',
+        );
+      });
+    });
+
+    describe('updating context', () => {
+      beforeEach(() => {
+        rootState.setContext('count', 0);
+      });
+
+      it('updates context through transformation function', () => {
+        rootState.updateContext((ctx) => ({ count: ctx.count + 1 }));
+        expect(rootState.getContext()).toEqual({ count: 1 });
+      });
+
+      it('can chain multiple updates', () => {
+        rootState.updateContext((ctx) => ({ count: ctx.count + 1 }));
+        rootState.updateContext((ctx) => ({ count: ctx.count * 2 }));
+        expect(rootState.getContext()).toEqual({ count: 2 });
+      });
+
+      it('propagates context changes to child states', () => {
+        const childState = new MachineNode<TestEvent, TestContext>({
+          id: 'child',
+        });
+        rootState.addChildState(childState);
+        rootState.updateContext((ctx) => ({ count: ctx.count + 1 }));
+        expect(childState.getContext()).toEqual({ count: 1 });
+      });
+
+      it('throws when context is not found', () => {
+        const orphanState = new MachineNode<TestEvent, TestContext>({
+          id: 'orphan',
+        });
+        expect(() =>
+          orphanState.updateContext((ctx) => ({ count: ctx.count + 1 })),
+        ).toThrow('Context not found');
+      });
+
+      it('throws when transformation returns invalid context', () => {
+        expect(() =>
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          rootState.updateContext((ctx) => ctx.count as any),
+        ).toThrow();
+      });
     });
   });
 

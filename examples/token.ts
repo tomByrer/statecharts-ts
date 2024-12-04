@@ -1,6 +1,6 @@
 // examples/token.ts
 import { machineFactory } from '../src';
-import { invariant } from '../src/lib';
+import { invariant } from '../src/lib/invariant';
 
 function generateFakeGUID() {
   const hexDigits = '0123456789abcdef';
@@ -68,9 +68,9 @@ const machine = machineFactory<Events, Context>({
   },
   states: {
     unauthenticated: {
+      initial: 'idle',
       states: {
         idle: {
-          initial: 'idle',
           on: {
             AUTHENTICATE: () => 'fetchingToken',
           },

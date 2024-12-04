@@ -8,11 +8,13 @@ export class Machine<E extends MachineEvent, C extends object> {
 
   constructor(
     config: ValidateStateNode<E, C, StateConfigNode<E, C>> & {
+      id?: string;
       events: E;
       context?: C;
     },
   ) {
-    this.#machine = new MachineNode<E, C>({ id: 'root', ...config });
+    const { id = 'root', ...rest } = config;
+    this.#machine = new MachineNode<E, C>({ id, ...rest });
     this.#subscription = new Subscription();
   }
 

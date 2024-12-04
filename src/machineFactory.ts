@@ -27,6 +27,7 @@ export type ValidateStateNode<
 
 export function machineFactory<E extends MachineEvent, C extends object>(
   config: ValidateStateNode<E, C, StateConfigNode<E, C>> & {
+    id?: string;
     events: E;
     context?: C;
   },

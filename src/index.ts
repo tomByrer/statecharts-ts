@@ -1,1 +1,1 @@
-export { machineFactory } from './machineFactory';
+export { buildStatechart as machineFactory } from './createMachine';

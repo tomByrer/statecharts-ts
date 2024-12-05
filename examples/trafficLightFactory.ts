@@ -1,6 +1,6 @@
-import { machineFactory } from '../src/machineFactory';
+import { createMachine } from '../src/createMachine';
 
-const machine = machineFactory({
+const machine = createMachine({
   events: { type: 'STOP' } as const,
   id: 'machine',
   context: {

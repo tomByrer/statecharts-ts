@@ -1,5 +1,4 @@
-// examples/token.ts
-import { machineFactory } from '../src';
+import { createMachine } from '../src/createMachine';
 import { invariant } from '../src/lib/invariant';
 
 function generateFakeGUID() {
@@ -51,21 +50,25 @@ type Events =
   | { type: 'REFRESH_TOKEN' }
   | { type: 'REFRESH_ERROR' };
 
-type Context = {
-  token: {
-    accessToken: string;
-    refreshToken: string;
-    expiresAt: number;
-  } | null;
-  attempts: number;
+type Token = {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number;
 };
 
-const machine = machineFactory<Events, Context>({
+type Credentials = {
+  username: string;
+  password: string;
+};
+
+const machine = createMachine({
   events: {} as Events,
   context: {
-    token: null,
+    token: null as Token | null,
     attempts: 0,
+    credentials: null as Credentials | null,
   },
+  initial: 'unauthenticated',
   states: {
     unauthenticated: {
       initial: 'idle',
@@ -76,30 +79,15 @@ const machine = machineFactory<Events, Context>({
           },
         },
         fetchingToken: {
-          onEntry: async ({ event, setContext }) => {
-            setContext(() => ({ token: null, attempts: 0 }));
+          onEntry: async ({ context, setContext }) => {
+            const { attempts, credentials } = context;
 
-            invariant(event.type === 'AUTHENTICATE', 'Invalid event type');
-
-            const { username, password } = event.data;
+            invariant(credentials, 'Invalid credentials');
+            setContext('attempts', attempts + 1);
 
             try {
-              setContext(({ attempts }) => ({
-                token: null,
-                attempts: attempts + 1,
-              }));
-
-              const { accessToken, refreshToken, expiresAt } =
-                await mockFetchToken({ username, password });
-
-              setContext({
-                token: {
-                  accessToken,
-                  refreshToken,
-                  expiresAt,
-                },
-                attempts: 0,
-              });
+              const token = await mockFetchToken(credentials);
+              setContext('token', token);
 
               return 'authenticated';
             } catch {
@@ -107,13 +95,7 @@ const machine = machineFactory<Events, Context>({
             }
           },
         },
-        fetchingTokenError: {
-          onEntry: ({ after }) => {
-            after(1000, () => {
-              return 'idle';
-            });
-          },
-        },
+        fetchingTokenError: {},
       },
     },
     authenticated: {
@@ -129,18 +111,15 @@ const machine = machineFactory<Events, Context>({
           },
         },
         refreshingToken: {
-          onEntry: async ({ event, setContext, context }) => {
-            invariant(event.type === 'REFRESH_TOKEN', 'Invalid event type');
+          onEntry: async ({ setContext, context }) => {
             invariant(context.token, 'Invalid context');
 
             try {
               const { accessToken, refreshToken, expiresAt } =
                 await mockRefreshToken(context.token.refreshToken);
 
-              setContext({
-                token: { accessToken, refreshToken, expiresAt },
-                attempts: 0,
-              });
+              setContext('token', { accessToken, refreshToken, expiresAt });
+              setContext('attempts', 0);
 
               return 'waitForExpiration';
             } catch {
@@ -158,7 +137,7 @@ const machine = machineFactory<Events, Context>({
       },
     },
   },
-} as const);
+});
 
 machine.subscribe((state) => {
   console.log('Current state:', state);

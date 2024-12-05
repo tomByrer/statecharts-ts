@@ -1,4 +1,4 @@
-import { StateMachine } from '../machineFactory';
+import { StateMachine } from '../createMachine';
 import { useState, useEffect } from 'react';
 
 export function useMachine<E extends MachineEvent, C, S extends string>(

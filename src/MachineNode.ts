@@ -106,7 +106,7 @@ export class StateRegistryError extends Error {
 }
 
 export type StateNodeOptions<E extends MachineEvent, C extends object> = {
-  id: string;
+  id?: string;
   events?: E;
   parallel?: boolean;
   context?: C;
@@ -160,7 +160,7 @@ export class MachineNode<E extends MachineEvent, C extends object> {
   }
 
   constructor(options: StateNodeOptions<E, C>) {
-    this.#id = options.id;
+    this.#id = options.id ?? 'root';
     this.#context = options.context;
     this.#parallel = options.parallel ?? false;
     this.onEntry = options.onEntry;

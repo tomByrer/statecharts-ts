@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { MachineEvent } from '../MachineNode';
-import { machineFactory } from '../machineFactory';
+import { createMachine } from '../createMachine';
 
 interface TestEvent extends MachineEvent {
   type: 'START' | 'STOP';
@@ -8,7 +8,7 @@ interface TestEvent extends MachineEvent {
 
 describe('machineFactory', () => {
   it('should create a state machine with the given configuration', () => {
-    const machine = machineFactory({
+    const machine = createMachine({
       events: { type: 'START' } as TestEvent,
       context: { count: 0 },
       initial: 'idle',
@@ -31,7 +31,7 @@ describe('machineFactory', () => {
   });
 
   it('should transition states based on events', () => {
-    const machine = machineFactory({
+    const machine = createMachine({
       context: { count: 0 },
       events: { type: 'START' } as TestEvent,
       initial: 'idle',

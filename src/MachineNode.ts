@@ -666,4 +666,13 @@ export class MachineNode<E extends MachineEvent, C extends object> {
 
     return currentState.active;
   }
+
+  /**
+   * Clones the current state node.
+   *
+   * @returns A new state node with the same context and children.
+   */
+  clone() {
+    return new MachineNode<E, C>(this);
+  }
 }

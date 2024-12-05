@@ -10,8 +10,9 @@ export class Machine<
   #machine: MachineNode<E, C>;
   #subscription: Subscription;
 
-  constructor(config: ValidateStateNode<E, C, T>) {
-    this.#machine = new MachineNode<E, C>(config);
+  constructor(config: ValidateStateNode<E, C, T> | MachineNode<E, C>) {
+    this.#machine =
+      config instanceof MachineNode ? config : new MachineNode<E, C>(config);
     this.#subscription = new Subscription();
   }
 
@@ -29,5 +30,11 @@ export class Machine<
 
   subscribe(handler: (state: string) => void) {
     return this.#subscription.subscribe(handler);
+  }
+
+  clone() {
+    const machine = new Machine<E, C, T>(this.#machine.clone());
+
+    return machine;
   }
 }

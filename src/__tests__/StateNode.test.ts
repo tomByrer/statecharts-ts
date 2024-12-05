@@ -20,7 +20,7 @@ describe('MachineNode', () => {
   describe('initialization', () => {
     it('creates a state node with correct initial values', () => {
       expect(rootState.id).toBe('root');
-      expect(rootState.getContext()).toEqual({ count: 0 });
+      expect(rootState.context).toEqual({ count: 0 });
       expect(rootState.active).toBe(false);
     });
   });
@@ -97,13 +97,13 @@ describe('MachineNode', () => {
     describe('setting context', () => {
       it('sets context value directly', () => {
         rootState.setContext('count', 1);
-        expect(rootState.getContext()).toEqual({ count: 1 });
+        expect(rootState.context).toEqual({ count: 1 });
       });
 
       it('updates existing context value', () => {
         rootState.setContext('count', 1);
         rootState.setContext('count', 2);
-        expect(rootState.getContext()).toEqual({ count: 2 });
+        expect(rootState.context).toEqual({ count: 2 });
       });
 
       it('propagates context changes to child states', () => {
@@ -112,7 +112,7 @@ describe('MachineNode', () => {
         });
         rootState.addChildState(childState);
         rootState.setContext('count', 1);
-        expect(childState.getContext()).toEqual({ count: 1 });
+        expect(childState.context).toEqual({ count: 1 });
       });
 
       it('throws when context is not found', () => {
@@ -132,13 +132,13 @@ describe('MachineNode', () => {
 
       it('updates context through transformation function', () => {
         rootState.updateContext((ctx) => ({ count: ctx.count + 1 }));
-        expect(rootState.getContext()).toEqual({ count: 1 });
+        expect(rootState.context).toEqual({ count: 1 });
       });
 
       it('can chain multiple updates', () => {
         rootState.updateContext((ctx) => ({ count: ctx.count + 1 }));
         rootState.updateContext((ctx) => ({ count: ctx.count * 2 }));
-        expect(rootState.getContext()).toEqual({ count: 2 });
+        expect(rootState.context).toEqual({ count: 2 });
       });
 
       it('propagates context changes to child states', () => {
@@ -147,7 +147,7 @@ describe('MachineNode', () => {
         });
         rootState.addChildState(childState);
         rootState.updateContext((ctx) => ({ count: ctx.count + 1 }));
-        expect(childState.getContext()).toEqual({ count: 1 });
+        expect(childState.context).toEqual({ count: 1 });
       });
 
       it('throws when context is not found', () => {

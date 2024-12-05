@@ -9,9 +9,15 @@ import {
 import { Machine } from './Machine';
 
 export type StateNode<E extends MachineEvent, C extends object> = {
+  id?: string;
+  context: C;
+  initial?: string;
   states: Record<string, Partial<StateNode<E, C>>>;
   onEntry?: EntryHandler<C>;
   onExit?: ExitHandler<C>;
+  on?: {
+    [K in E['type']]?: EventHandler<Extract<E, { type: K }>, C>;
+  };
 };
 
 type CoerceStateNode<
@@ -19,18 +25,18 @@ type CoerceStateNode<
   C extends object,
   T extends StateNode<E, C>,
 > = {
-  on?: {
-    [K in E['type']]?: EventHandler<Extract<E, { type: K }>, C>;
-  };
   id?: string;
   context: C;
+  events: E;
   initial: keyof T['states'];
   states: {
     [K in keyof T['states']]: T['states'][K] extends StateNode<E, C>
       ? CoerceStateNode<E, C, T['states'][K]>
       : T['states'][K];
   };
-  events: E;
+  on?: {
+    [K in E['type']]?: EventHandler<Extract<E, { type: K }>, C>;
+  };
 };
 
 export type ValidateStateNode<

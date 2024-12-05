@@ -159,6 +159,26 @@ export class MachineNode<E extends MachineEvent, C extends object> {
     return this.#children;
   }
 
+  get context(): C {
+    if (this.#context !== undefined) {
+      return this.#context;
+    } else if (this.#parentStateNode) {
+      return this.#parentStateNode.context;
+    } else {
+      throw new Error('Context not found in current or parent state nodes');
+    }
+  }
+
+  set context(value: C) {
+    if (this.#context !== undefined) {
+      this.#context = value;
+    } else if (this.#parentStateNode) {
+      this.#parentStateNode.context = value;
+    } else {
+      throw new Error('Context not found in current or parent state nodes');
+    }
+  }
+
   constructor(options: StateNodeOptions<E, C>) {
     this.#id = options.id ?? 'root';
     this.#context = options.context;
@@ -266,7 +286,7 @@ export class MachineNode<E extends MachineEvent, C extends object> {
       if (handler) {
         const targetId = handler({
           event: event as Extract<E, { type: E['type'] }>,
-          context: this.getContext(),
+          context: this.context,
           setContext: this.setContext.bind(this),
           updateContext: this.updateContext.bind(this),
         });
@@ -369,7 +389,7 @@ export class MachineNode<E extends MachineEvent, C extends object> {
   }
 
   private notifyAncestorsOfTransition(targetState: MachineNode<E, C>) {
-    const context = this.getContext();
+    const context = this.context;
     const setContext = this.setContext.bind(this);
     const updateContext = this.updateContext.bind(this);
     let currentState = targetState.#parentStateNode;
@@ -420,7 +440,7 @@ export class MachineNode<E extends MachineEvent, C extends object> {
     this.#active = true;
 
     // Bind the after function to the current state context
-    const context = this.getContext();
+    const context = this.context;
     const after = this.after.bind(this);
     const setContext = this.setContext.bind(this);
     const updateContext = this.updateContext.bind(this);
@@ -486,7 +506,7 @@ export class MachineNode<E extends MachineEvent, C extends object> {
     this.#timers = [];
 
     const exitPromise = this.onExit?.({
-      context: this.getContext(),
+      context: this.context,
     });
 
     // Exit active children, preserving history if specified
@@ -514,7 +534,7 @@ export class MachineNode<E extends MachineEvent, C extends object> {
     const timer = setTimeout(async () => {
       // Execute the callback function to get the ID of the state to transition to
       const stateId = await callback({
-        context: this.getContext(),
+        context: this.context,
         setContext: this.setContext.bind(this),
         updateContext: this.updateContext.bind(this),
       });
@@ -609,22 +629,7 @@ export class MachineNode<E extends MachineEvent, C extends object> {
    * @param value - The value to set.
    */
   setContext<K extends keyof C>(key: K, value: C[K]): void {
-    if (this.#context !== undefined) {
-      this.#context = { ...this.#context, [key]: value };
-    } else if (this.#parentStateNode) {
-      this.#parentStateNode.setContext(key, value);
-    } else {
-      throw new Error('Context not found in current or parent state nodes');
-    }
-  }
-
-  /**
-   * Returns the context of the current state node.
-   *
-   * @returns The context of the current state node.
-   */
-  getContext(): C {
-    return this.#context ?? (this.#parentStateNode?.getContext() as C);
+    this.context[key] = value;
   }
 
   /**
@@ -633,13 +638,7 @@ export class MachineNode<E extends MachineEvent, C extends object> {
    * @param callback - A function that takes the current context and returns the new context.
    */
   updateContext(callback: (context: C) => C) {
-    if (this.#context !== undefined) {
-      this.#context = callback(this.#context);
-    } else if (this.#parentStateNode) {
-      this.#parentStateNode.updateContext(callback);
-    } else {
-      throw new Error('Context not found in current or parent state nodes');
-    }
+    this.context = callback(this.context);
   }
 
   /**

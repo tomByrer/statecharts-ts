@@ -2,12 +2,16 @@ import { ValidateStateNode, StateNode } from './createMachine';
 import { MachineEvent, MachineNode } from './MachineNode';
 import { Subscription } from './Subscription';
 
-export class Machine<C extends object, T extends StateNode<MachineEvent, C>> {
-  #machine: MachineNode<T['events'], C>;
+export class Machine<
+  E extends MachineEvent,
+  C extends object,
+  T extends StateNode<E, C>,
+> {
+  #machine: MachineNode<E, C>;
   #subscription: Subscription;
 
-  constructor(config: ValidateStateNode<C, T>) {
-    this.#machine = new MachineNode<T['events'], C>(config);
+  constructor(config: ValidateStateNode<E, C, T>) {
+    this.#machine = new MachineNode<E, C>(config);
     this.#subscription = new Subscription();
   }
 
@@ -19,7 +23,7 @@ export class Machine<C extends object, T extends StateNode<MachineEvent, C>> {
     this.#machine.exit();
   }
 
-  dispatch(event: T['events']) {
+  dispatch(event: E) {
     this.#machine.dispatch(event);
   }
 

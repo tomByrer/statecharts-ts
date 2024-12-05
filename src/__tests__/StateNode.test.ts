@@ -11,7 +11,7 @@ describe('MachineNode', () => {
   let rootState: MachineNode<TestEvent, TestContext>;
 
   beforeEach(() => {
-    rootState = new MachineNode<TestEvent, TestContext>({
+    rootState = new MachineNode({
       id: 'root',
       context: { count: 0 },
     });
@@ -30,7 +30,7 @@ describe('MachineNode', () => {
       const onEntry = vi.fn();
       const onExit = vi.fn();
 
-      const rootState = new MachineNode<TestEvent, TestContext>({
+      const rootState = new MachineNode({
         id: 'root',
         onEntry,
         onExit,
@@ -47,6 +47,7 @@ describe('MachineNode', () => {
         id: 'child',
       });
       const result = rootState.addChildState(childState);
+
       expect(result).toBe(rootState);
       expect(rootState.children).toContain(childState);
     });
@@ -56,6 +57,7 @@ describe('MachineNode', () => {
         id: 'child',
       });
       const result = rootState.addChildState(childState, true);
+
       expect(result).toBe(rootState);
       expect(rootState.initialChildId).toBe(childState.id);
     });
@@ -68,6 +70,7 @@ describe('MachineNode', () => {
       });
       rootState.addChildState(childState);
       rootState.removeChildState(childState);
+
       expect(rootState.children).not.toContain(childState);
     });
 
@@ -77,6 +80,7 @@ describe('MachineNode', () => {
       });
       rootState.addChildState(childState, true);
       rootState.removeChildState(childState);
+
       expect(rootState.initialChildId).toBeUndefined();
     });
   });
@@ -84,11 +88,13 @@ describe('MachineNode', () => {
   describe('child state creation', () => {
     it('creates and appends new child state', () => {
       const result = rootState.appendChild({ id: 'child' });
+
       expect(rootState.children).toContain(result);
     });
 
     it('marks newly created child as initial state', () => {
       const result = rootState.appendChild({ id: 'child', initial: true });
+
       expect(rootState.initialChildId).toBe(result.id);
     });
   });
@@ -97,12 +103,14 @@ describe('MachineNode', () => {
     describe('setting context', () => {
       it('sets context value directly', () => {
         rootState.setContext('count', 1);
+
         expect(rootState.context).toEqual({ count: 1 });
       });
 
       it('updates existing context value', () => {
         rootState.setContext('count', 1);
         rootState.setContext('count', 2);
+
         expect(rootState.context).toEqual({ count: 2 });
       });
 
@@ -112,6 +120,7 @@ describe('MachineNode', () => {
         });
         rootState.addChildState(childState);
         rootState.setContext('count', 1);
+
         expect(childState.context).toEqual({ count: 1 });
       });
 
@@ -119,9 +128,8 @@ describe('MachineNode', () => {
         const orphanState = new MachineNode<TestEvent, TestContext>({
           id: 'orphan',
         });
-        expect(() => orphanState.setContext('count', 1)).toThrow(
-          'Context not found',
-        );
+
+        expect(() => orphanState.setContext('count', 1)).toThrow();
       });
     });
 
@@ -132,12 +140,14 @@ describe('MachineNode', () => {
 
       it('updates context through transformation function', () => {
         rootState.updateContext((ctx) => ({ count: ctx.count + 1 }));
+
         expect(rootState.context).toEqual({ count: 1 });
       });
 
       it('can chain multiple updates', () => {
         rootState.updateContext((ctx) => ({ count: ctx.count + 1 }));
         rootState.updateContext((ctx) => ({ count: ctx.count * 2 }));
+
         expect(rootState.context).toEqual({ count: 2 });
       });
 
@@ -147,6 +157,7 @@ describe('MachineNode', () => {
         });
         rootState.addChildState(childState);
         rootState.updateContext((ctx) => ({ count: ctx.count + 1 }));
+
         expect(childState.context).toEqual({ count: 1 });
       });
 
@@ -154,9 +165,27 @@ describe('MachineNode', () => {
         const orphanState = new MachineNode<TestEvent, TestContext>({
           id: 'orphan',
         });
+
         expect(() =>
           orphanState.updateContext((ctx) => ({ count: ctx.count + 1 })),
         ).toThrow('Context not found');
+      });
+
+      it('updates partial context while preserving other values', () => {
+        const rootState = new MachineNode({
+          id: 'root',
+          context: { count: 0, value: 1 },
+        });
+
+        // Update only count, leaving value unchanged
+        rootState.updateContext((ctx) => ({ count: ctx.count + 1 }));
+
+        expect(rootState.context).toEqual({ count: 1, value: 1 });
+
+        // Verify value can still be updated separately
+        rootState.updateContext((ctx) => ({ value: ctx.value + 1 }));
+
+        expect(rootState.context).toEqual({ count: 1, value: 2 });
       });
 
       it('throws when transformation returns invalid context', () => {
@@ -171,7 +200,8 @@ describe('MachineNode', () => {
   describe('event handling', () => {
     it('dispatches events to handlers when active', () => {
       const handler = vi.fn();
-      const rootState = new MachineNode<TestEvent, TestContext>({
+      const rootState = new MachineNode({
+        events: {} as TestEvent,
         id: 'root',
         on: {
           TEST: handler,
@@ -179,6 +209,7 @@ describe('MachineNode', () => {
       });
       rootState.enter();
       rootState.dispatch({ type: 'TEST', data: { value: 42 } });
+
       expect(handler).toHaveBeenCalled();
     });
 
@@ -191,6 +222,7 @@ describe('MachineNode', () => {
         },
       });
       rootState.dispatch({ type: 'TEST', data: { value: 42 } });
+
       expect(handler).not.toHaveBeenCalled();
     });
 
@@ -205,21 +237,33 @@ describe('MachineNode', () => {
       rootState.addChildState(childState);
       rootState.enter();
       rootState.dispatch({ type: 'TEST', data: { value: 42 } });
+
       expect(eventHandler).toHaveBeenCalled();
     });
   });
 
   describe('state transitions', () => {
-    describe('transitions initial child state on parent entry', async () => {
-      const childState1 = new MachineNode<TestEvent, TestContext>({
-        id: 'child1',
-        onEntry: vi.fn(),
-        onExit: vi.fn(),
-      });
-      const childState2 = new MachineNode<TestEvent, TestContext>({
-        id: 'child2',
-        onEntry: vi.fn(),
-        onExit: vi.fn(),
+    describe('transitions initial child state on parent entry', () => {
+      let rootState: MachineNode<TestEvent, TestContext>;
+      let childState1: MachineNode<TestEvent, TestContext>;
+      let childState2: MachineNode<TestEvent, TestContext>;
+
+      beforeEach(() => {
+        rootState = new MachineNode<TestEvent, TestContext>({
+          id: 'root',
+        });
+
+        childState1 = new MachineNode<TestEvent, TestContext>({
+          id: 'child1',
+          onEntry: vi.fn(),
+          onExit: vi.fn(),
+        });
+
+        childState2 = new MachineNode<TestEvent, TestContext>({
+          id: 'child2',
+          onEntry: vi.fn(),
+          onExit: vi.fn(),
+        });
       });
 
       it('when initial state is not set', () => {
@@ -265,18 +309,18 @@ describe('MachineNode', () => {
       let child2: MachineNode<TestEvent, TestContext>;
 
       beforeEach(() => {
-        rootState = new MachineNode<TestEvent, TestContext>({
+        rootState = new MachineNode({
           id: 'root',
           parallel: true,
         });
 
-        child1 = new MachineNode<TestEvent, TestContext>({
+        child1 = new MachineNode({
           id: 'child1',
           onEntry: vi.fn(),
           onExit: vi.fn(),
         });
 
-        child2 = new MachineNode<TestEvent, TestContext>({
+        child2 = new MachineNode({
           id: 'child2',
           onEntry: vi.fn(),
           onExit: vi.fn(),
@@ -288,6 +332,7 @@ describe('MachineNode', () => {
 
       it('activates all child states on enter', async () => {
         await rootState.enter();
+
         expect(child1.active).toBe(true);
         expect(child2.active).toBe(true);
       });
@@ -295,6 +340,7 @@ describe('MachineNode', () => {
       it('deactivates all child states on exit', async () => {
         await rootState.enter();
         await rootState.exit();
+
         expect(child1.active).toBe(false);
         expect(child2.active).toBe(false);
       });
@@ -362,6 +408,7 @@ describe('MachineNode', () => {
       });
 
       rootState.addChildState(child1);
+
       expect(() => rootState.addChildState(child2)).toThrow();
     });
 

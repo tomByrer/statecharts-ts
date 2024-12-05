@@ -160,13 +160,11 @@ export class MachineNode<E extends MachineEvent, C extends object> {
   }
 
   get context(): C {
-    if (this.#context !== undefined) {
+    if (this.#context) {
       return this.#context;
-    } else if (this.#parentStateNode) {
-      return this.#parentStateNode.context;
-    } else {
-      throw new Error('Context not found in current or parent state nodes');
     }
+
+    return this.#parentStateNode?.context as C;
   }
 
   set context(value: C) {
@@ -435,7 +433,6 @@ export class MachineNode<E extends MachineEvent, C extends object> {
    * Enters the current state.
    */
   async enter() {
-    console.log('Entering state', this.id);
     // Set the state as active
     this.#active = true;
 
@@ -637,8 +634,21 @@ export class MachineNode<E extends MachineEvent, C extends object> {
    *
    * @param callback - A function that takes the current context and returns the new context.
    */
-  updateContext(callback: (context: C) => C) {
-    this.context = callback(this.context);
+  updateContext(callback: (context: C) => Partial<C>) {
+    if (!this.#context) {
+      throw new Error('Context not found');
+    }
+
+    const result = callback(this.context);
+
+    if (typeof result !== 'object') {
+      throw new Error('Context update must return an object');
+    }
+
+    this.context = {
+      ...this.context,
+      ...result,
+    };
   }
 
   /**

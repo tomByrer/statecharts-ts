@@ -259,6 +259,6 @@ statecharts-ts is inspired by:
 
 ## License
 
-MIT © [Your Name]
+MIT © 2024 Michael Beswick
 
 ---
